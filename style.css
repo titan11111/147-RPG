@@ -1,0 +1,51 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #111;
+  overflow: hidden;
+  position: fixed;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  /* スクロールバー非表示 */
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+/* iOS Safari: dvh 非対応 (iOS < 15.4) 向けフォールバック */
+.game-frame {
+  height: 100vh;        /* iOS 15.4未満 / 旧ブラウザ用 */
+  height: 100dvh;       /* iOS 15.4+: アドレスバー高さを除いた正確な表示領域 */
+}
+
+button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 60ms ease, filter 80ms ease, box-shadow 80ms ease;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+button:active,
+button.btn-pressed {
+  transform: translateY(1px) scale(0.96);
+  filter: brightness(1.08);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+}

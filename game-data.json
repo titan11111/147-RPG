@@ -1,0 +1,6 @@
+{
+  "encounter": {
+    "min": 10,
+    "variance": 12
+  }
+}
