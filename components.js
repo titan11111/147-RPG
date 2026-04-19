@@ -169,6 +169,116 @@ function NpcSprite({ bodyColor = "#a3e635", hairColor = "#1a0a00", size = 28 }) 
            style={{ imageRendering:"pixelated", display:"block" }} />;
 }
 
+// 猫の村の NPC（人型ではなくネコのシルエット。毛色は NPC_PALETTE の body/hair を流用）
+function CatNpcSprite({ furColor = "#fca5a5", markColor = "#7c2d12", size = 28 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const s = size;
+    const cx = s / 2;
+    ctx.clearRect(0, 0, s, s);
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(cx, s * 0.9, s * 0.24, s * 0.075, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = furColor;
+    ctx.lineWidth = Math.max(2, s * 0.085);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.18, s * 0.7);
+    ctx.quadraticCurveTo(cx + s * 0.38, s * 0.52, cx + s * 0.32, s * 0.26);
+    ctx.stroke();
+
+    ctx.fillStyle = furColor;
+    ctx.beginPath();
+    ctx.ellipse(cx, s * 0.64, s * 0.24, s * 0.19, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.32)";
+    ctx.lineWidth = Math.max(1, s * 0.028);
+    ctx.stroke();
+
+    ctx.strokeStyle = markColor;
+    ctx.lineWidth = Math.max(1, s * 0.022);
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.06, s * 0.54);
+    ctx.quadraticCurveTo(cx - s * 0.02, s * 0.62, cx - s * 0.1, s * 0.7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.08, s * 0.56);
+    ctx.quadraticCurveTo(cx + s * 0.12, s * 0.65, cx + s * 0.02, s * 0.72);
+    ctx.stroke();
+
+    ctx.fillStyle = furColor;
+    ctx.beginPath();
+    ctx.arc(cx, s * 0.36, s * 0.21, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.32)";
+    ctx.lineWidth = Math.max(1, s * 0.028);
+    ctx.stroke();
+
+    const ear = (side) => {
+      ctx.fillStyle = furColor;
+      ctx.beginPath();
+      ctx.moveTo(cx + side * s * 0.05, s * 0.22);
+      ctx.lineTo(cx + side * s * 0.2, s * 0.05);
+      ctx.lineTo(cx + side * s * 0.17, s * 0.23);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "rgba(254,205,211,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(cx + side * s * 0.08, s * 0.2);
+      ctx.lineTo(cx + side * s * 0.16, s * 0.1);
+      ctx.lineTo(cx + side * s * 0.14, s * 0.21);
+      ctx.closePath();
+      ctx.fill();
+    };
+    ear(-1);
+    ear(1);
+
+    ctx.fillStyle = "#fef9c3";
+    ctx.beginPath();
+    ctx.ellipse(cx - s * 0.07, s * 0.34, s * 0.048, s * 0.062, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + s * 0.07, s * 0.34, s * 0.048, s * 0.062, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.ellipse(cx - s * 0.07, s * 0.34, s * 0.016, s * 0.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + s * 0.07, s * 0.34, s * 0.016, s * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#fda4af";
+    ctx.beginPath();
+    ctx.moveTo(cx, s * 0.4);
+    ctx.lineTo(cx - s * 0.028, s * 0.46);
+    ctx.lineTo(cx + s * 0.028, s * 0.46);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.lineWidth = Math.max(0.8, s * 0.018);
+    for (let i = -1; i <= 1; i++) {
+      const y = s * 0.42 + i * s * 0.028;
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.18, y);
+      ctx.lineTo(cx - s * 0.32, y + i * s * 0.012);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + s * 0.18, y);
+      ctx.lineTo(cx + s * 0.32, y + i * s * 0.012);
+      ctx.stroke();
+    }
+  }, [furColor, markColor, size]);
+
+  return <canvas ref={canvasRef} width={size} height={size}
+           style={{ imageRendering:"pixelated", display:"block" }} />;
+}
+
 // ─── TILE CANVAS GRAPHICS ────────────────────────────────────────────────────
 
 function _drawGrass(ctx, w, h) {
@@ -448,7 +558,7 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
     ctx.clearRect(0, 0, s, s);
 
     // ドット絵（画像）がある場合は画像で描画する（無ければ従来の図形描画）
-    // 画像は `146-RPG/images/enemy-${id}.png`（透過PNG想定）
+    // 戦闘中の敵ドット: `./images/enemy-${id}.png`（透過PNG想定）。タイトル画面とは別。無ければベクター。
     const getEnemyImage = (id) => {
       if (!EnemySprite.__imgCache) EnemySprite.__imgCache = new Map();
       const cache = EnemySprite.__imgCache;
@@ -460,6 +570,7 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
     };
 
     const isSlime = enemy.id === 0;
+    const isMiniSlime = enemy.id === 5;
     const isDrango = enemy.id === 38;
 
     const tier = enemy.id >= 36 ? "boss" : enemy.id >= 24 ? "heavy" : enemy.id >= 16 ? "beast" : "basic";
@@ -514,6 +625,56 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
       };
       img.onload = onLoad;
       img.onerror = onError;
+    }
+
+    // ミニスライム（戦闘）：enemy-5.png が無ければ専用ベクター（通常スライムより小さく丸顔）
+    if (isMiniSlime) {
+      const drawMiniSlimeVector = () => {
+        ctx.clearRect(0, 0, s, s);
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.beginPath();
+        ctx.ellipse(cx, s * 0.88, s * 0.15, s * 0.048, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const cy0 = cy + s * 0.05;
+        const r = s * 0.17;
+        const g = ctx.createRadialGradient(cx - r * 0.35, cy0 - r * 0.45, r * 0.08, cx, cy0, r);
+        g.addColorStop(0, flash ? "#ecfccb" : "#d1fae5");
+        g.addColorStop(1, flash ? "#86efac" : "#34d399");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = Math.max(1, s * 0.016);
+        ctx.stroke();
+        ctx.fillStyle = flash ? "#a7f3d0" : "rgba(16,185,129,0.45)";
+        ctx.beginPath();
+        ctx.arc(cx - s * 0.055, cy0 + s * 0.03, s * 0.02, 0, Math.PI * 2);
+        ctx.arc(cx + s * 0.065, cy0 - s * 0.02, s * 0.016, 0, Math.PI * 2);
+        ctx.fill();
+        const er = Math.max(1.5, s * 0.03);
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(cx - s * 0.06, cy0 - s * 0.06, er, 0, Math.PI * 2);
+        ctx.arc(cx + s * 0.06, cy0 - s * 0.06, er, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(cx - s * 0.052, cy0 - s * 0.068, er * 0.32, 0, Math.PI * 2);
+        ctx.arc(cx + s * 0.068, cy0 - s * 0.065, er * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(15,23,42,0.88)";
+        ctx.lineWidth = Math.max(1, s * 0.014);
+        ctx.beginPath();
+        ctx.arc(cx, cy0 + s * 0.065, s * 0.04, 0.12 * Math.PI, 0.88 * Math.PI);
+        ctx.stroke();
+        if (flash) {
+          ctx.fillStyle = "rgba(255,255,255,0.22)";
+          ctx.fillRect(0, 0, s, s);
+        }
+      };
+      drawMiniSlimeVector();
+      return;
     }
 
     // Shadow
@@ -1171,6 +1332,40 @@ function HPBar({ label, current, max, color = "green" }) {
 }
 
 // ─── SCREENS ─────────────────────────────────────────────────────────────────
+// タイトル用画像（`147-RPG/images/`）。上から順に最初に読み込めた1枚だけ採用。
+// 未配置のスロットはキャンバス／テキストのまま（足りない一覧はリリースノートや返信で明示）。
+const TITLE_IMG_BG = [
+  "./images/title-bg.png", "./images/title-bg.jpg", "./images/title-background.png",
+  "./images/title_sky.png", "./images/night-sky.png", "./images/bg-title.png",
+];
+const TITLE_IMG_FG = [
+  "./images/title-mountains.png", "./images/title-silhouette.png", "./images/title-foreground.png",
+  "./images/title-ground.png", "./images/mountains.png", "./images/silhouette.png",
+];
+const TITLE_IMG_LOGO = [
+  "./images/title-logo.png", "./images/logo.png", "./images/manabi-logo.png",
+  "./images/title.png", "./images/title-text.png",
+];
+
+function loadFirstAvailableImage(paths, onReady) {
+  let i = 0;
+  let cancelled = false;
+  const next = () => {
+    if (cancelled) return;
+    if (i >= paths.length) {
+      onReady(null);
+      return;
+    }
+    const img = new Image();
+    const src = paths[i];
+    img.onload = () => { if (!cancelled) onReady(img); };
+    img.onerror = () => { i++; next(); };
+    img.src = src;
+  };
+  next();
+  return () => { cancelled = true; };
+}
+
 function TitleScreen({ onStart, hasSave, onContinue }) {
   const canvasRef = useRef(null);
   const animRef   = useRef(null);
@@ -1178,12 +1373,26 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
   const [revealChar,  setRevealChar]  = useState(0);
   const [swept,       setSwept]       = useState(false);
   const [blink, setBlink] = useState(true);
+  const [titleBg, setTitleBg]   = useState(null);
+  const [titleFg, setTitleFg]   = useState(null);
+  const [titleLogo, setTitleLogo] = useState(null);
+
+  useEffect(() => {
+    const c1 = loadFirstAvailableImage(TITLE_IMG_BG, setTitleBg);
+    const c2 = loadFirstAvailableImage(TITLE_IMG_FG, setTitleFg);
+    const c3 = loadFirstAvailableImage(TITLE_IMG_LOGO, setTitleLogo);
+    return () => { c1(); c2(); c3(); };
+  }, []);
 
   const LINE1 = ['ぼ','く','ら','の'];
   const LINE2 = ['ま','な','び','の','旅'];
   const ALL   = [...LINE1, ...LINE2];
 
-  // ── Canvas（星空 + 雲スクロール + シルエット + 竜） ──
+  useEffect(() => {
+    if (titleLogo && phase >= 2) setRevealChar(ALL.length);
+  }, [titleLogo, phase, ALL.length]);
+
+  // ── Canvas（星空 + 雲スクロール + シルエット + 竜）／背景・手前画像があれば合成 ──
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1191,7 +1400,7 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
     const W = canvas.width  = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
 
-    const stars = Array.from({ length: 200 }, () => ({
+    const stars = Array.from({ length: titleBg ? 110 : 200 }, () => ({
       x: Math.random() * W, y: Math.random() * H * 0.78,
       r: Math.random() * 1.5 + 0.3,
       tw: Math.random() * 0.028 + 0.007,
@@ -1292,25 +1501,48 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
       ctx.restore();
     }
 
-    ctx.fillStyle = '#000008';
-    ctx.fillRect(0, 0, W, H);
+    if (!titleBg) {
+      ctx.fillStyle = "#000008";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawCover(img) {
+      const sc = Math.max(W / img.width, H / img.height);
+      const dw = img.width * sc;
+      const dh = img.height * sc;
+      const ox = (W - dw) / 2;
+      const oy = (H - dh) / 2;
+      ctx.drawImage(img, ox, oy, dw, dh);
+    }
 
     function loop(now = performance.now()) {
       const delta = now - lastTs;
       lastTs = now;
       frame += delta / 16.666;
-      ctx.fillStyle = 'rgba(0,0,8,0.17)';
-      ctx.fillRect(0, 0, W, H);
 
-      // 星
+      if (titleBg) {
+        ctx.globalAlpha = 1;
+        drawCover(titleBg);
+        ctx.fillStyle = 'rgba(2,0,18,0.48)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(0, 0, W, H * 0.35);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,8,0.17)';
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // 星（背景写真時は控えめ）
+      const starMul = titleBg ? 0.55 : 1;
       stars.forEach(s => {
-        const a = 0.2 + 0.8*((Math.sin(frame*s.tw + s.ph)+1)/2);
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(200,215,255,${a})`; ctx.fill();
+        const a = starMul * (0.15 + 0.55 * ((Math.sin(frame * s.tw + s.ph) + 1) / 2));
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200,215,255,${a})`;
+        ctx.fill();
       });
 
-      // 流れ星
-      if (frame % 95 === 0 && Math.random() < 0.65) {
+      // 流れ星（背景写真時は控えめ）
+      if (frame % 95 === 0 && Math.random() < (titleBg ? 0.22 : 0.65)) {
         meteors.push({ x:Math.random()*W*0.8, y:Math.random()*H*0.35, vx:4+Math.random()*3, vy:2+Math.random(), life:35, max:35 });
       }
       for (let i = meteors.length-1; i >= 0; i--) {
@@ -1326,40 +1558,62 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
         if (m.life <= 0) meteors.splice(i, 1);
       }
 
-      // 雲スクロール
-      clouds.forEach(c => {
+      // 雲スクロール（背景写真時は薄く）
+      clouds.forEach((c) => {
+        const prev = c.a;
+        if (titleBg) c.a = Math.min(0.055, prev * 0.55);
         drawCloud(c);
+        c.a = prev;
         c.x -= c.spd;
-        if (c.x + c.w < 0) { c.x = W + c.w; c.y = H*(0.07+Math.random()*0.28); }
+        if (c.x + c.w < 0) { c.x = W + c.w; c.y = H * (0.07 + Math.random() * 0.28); }
       });
 
-      // シルエット（山・城）
-      drawSilhouette();
+      if (titleFg) {
+        const maxH = H * 0.42;
+        const scale = Math.min(W / titleFg.width, maxH / titleFg.height);
+        const fw = titleFg.width * scale;
+        const fh = titleFg.height * scale;
+        const ox = (W - fw) / 2;
+        const oy = H - fh;
+        ctx.globalAlpha = 1;
+        ctx.drawImage(titleFg, ox, oy, fw, fh);
+      } else {
+        drawSilhouette();
+      }
 
       // 竜（一定周期で横切る）
       dragonPhase++;
       if (dragonPhase % 380 < 190) {
         dragonX += 1.3;
         if (dragonX > W + 100) dragonX = -120;
-        const dy = H*0.21 + 11*Math.sin(dragonPhase*0.038);
+        const dy = H * 0.21 + 11 * Math.sin(dragonPhase * 0.038);
+        ctx.save();
+        ctx.globalAlpha = titleBg ? 0.35 : 0.75;
         drawDragon(dragonX, dy, dragonPhase);
+        ctx.restore();
       }
 
-      // 金キラキラ
-      if (frame % 42 === 0) {
-        const sx = Math.random()*W*0.9, sy = Math.random()*H*0.6;
-        ctx.save(); ctx.translate(sx, sy);
+      // 金キラキラ（控えめ）
+      if (!titleBg && frame % 42 === 0) {
+        const sx = Math.random() * W * 0.9;
+        const sy = Math.random() * H * 0.6;
+        ctx.save();
+        ctx.translate(sx, sy);
         for (let k = 0; k < 4; k++) {
-          ctx.rotate(Math.PI/4);
-          ctx.beginPath(); ctx.moveTo(0,-5); ctx.lineTo(0,5);
-          ctx.strokeStyle='rgba(255,215,0,0.42)'; ctx.lineWidth=0.8; ctx.stroke();
+          ctx.rotate(Math.PI / 4);
+          ctx.beginPath();
+          ctx.moveTo(0, -5);
+          ctx.lineTo(0, 5);
+          ctx.strokeStyle = "rgba(255,215,0,0.22)";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
         }
         ctx.restore();
       }
 
       const titleIcon = RUNTIME_ASSETS.get("titleIcon");
       if (titleIcon) {
-        ctx.globalAlpha = 0.72 + 0.28 * Math.sin(frame * 0.08);
+        ctx.globalAlpha = (titleBg ? 0.38 : 0.72) + 0.22 * Math.sin(frame * 0.08);
         ctx.drawImage(titleIcon, W - 40, 8, 28, 28);
         ctx.globalAlpha = 1;
       }
@@ -1367,7 +1621,7 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
     }
     loop();
     return () => cancelAnimationFrame(animRef.current);
-  }, []);
+  }, [titleBg, titleFg]);
 
   // ── フェーズタイムライン ──
   useEffect(() => {
@@ -1439,18 +1693,18 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
       {/* Canvas（星・雲・シルエット・竜） */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-      {/* 暗転→白フラッシュ→消える */}
+      {/* 暗転→短いフラッシュ（眩しさ低減） */}
       <div className="absolute inset-0 pointer-events-none" style={{
         zIndex: 8,
-        background: 'white',
-        opacity: phase === 1 ? 0.55 : 0,
-        transition: phase === 1 ? 'opacity 0.12s ease' : 'opacity 0.55s ease',
+        background: "white",
+        opacity: phase === 1 ? 0.22 : 0,
+        transition: phase === 1 ? "opacity 0.1s ease" : "opacity 0.45s ease",
       }} />
 
-      {/* 中央パープルグロー */}
+      {/* 中央の色味（控えめ） */}
       <div className="absolute inset-0 pointer-events-none" style={{
         zIndex: 2,
-        background: 'radial-gradient(ellipse 68% 42% at 50% 42%, rgba(75,25,150,0.2) 0%, transparent 70%)',
+        background: "radial-gradient(ellipse 70% 44% at 50% 40%, rgba(55,30,95,0.09) 0%, transparent 72%)",
       }} />
 
       {/* コンテンツ */}
@@ -1459,39 +1713,58 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
 
         {/* サブタイトル */}
         <p style={{
-          fontFamily: DOT, fontSize: 10, letterSpacing: '0.4em',
-          color: '#c9a227',
-          textShadow: '0 0 10px rgba(201,162,39,0.9), 0 0 22px rgba(201,162,39,0.4)',
+          fontFamily: DOT, fontSize: 10, letterSpacing: "0.4em",
+          color: "#b8922e",
+          textShadow: "0 1px 2px rgba(0,0,0,0.75), 0 0 10px rgba(201,162,39,0.35)",
           opacity: phase >= 2 ? 1 : 0,
-          transition: 'opacity 0.8s ease',
+          transition: "opacity 0.8s ease",
         }}>～ FANTASY RPG ～</p>
 
-        {/* メインタイトル（逐次表示 + ライトスイープ） */}
-        <div style={{ position: 'relative', textAlign: 'center', overflow: 'hidden' }}>
-          <h1 style={{
-            fontFamily: DOT, fontSize: 38, fontWeight: 700,
-            lineHeight: 1.35, letterSpacing: '0.08em',
-            color: '#fff',
-            textShadow: '0 0 18px #ffd700, 0 0 48px #ffaa00, 0 0 80px rgba(255,140,0,0.3)',
-            WebkitTextStroke: '0.5px #ffd700',
-          }}>
-            <div>{LINE1.map((ch, i) => (
-              <span key={i} style={{ opacity: revealChar > i ? 1 : 0, transition: 'opacity 0.07s ease', display:'inline' }}>{ch}</span>
-            ))}</div>
-            <div>{LINE2.map((ch, i) => (
-              <span key={i+4} style={{ opacity: revealChar > i+4 ? 1 : 0, transition: 'opacity 0.07s ease', display:'inline' }}>{ch}</span>
-            ))}</div>
-          </h1>
-          {/* ライトスイープ（#3: phase >= 3 で一度だけ流れる） */}
-          {swept && (
+        {/* メインタイトル：images にロゴがあれば画像、なければテキスト（発光弱め） */}
+        <div style={{ position: "relative", textAlign: "center", overflow: "hidden" }}>
+          {titleLogo ? (
+            <div style={{ minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img
+                src={titleLogo.src}
+                alt=""
+                style={{
+                  maxWidth: "min(340px, 92vw)",
+                  maxHeight: "clamp(76px, 22vh, 168px)",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  opacity: phase >= 2 ? 1 : 0,
+                  transition: "opacity 0.5s ease",
+                  filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.85))",
+                }}
+              />
+            </div>
+          ) : (
+            <h1 style={{
+              fontFamily: DOT, fontSize: 38, fontWeight: 700,
+              lineHeight: 1.35, letterSpacing: "0.08em",
+              color: "#f5f5f0",
+              textShadow: "0 2px 4px rgba(0,0,0,0.82), 0 0 12px rgba(201,162,39,0.22)",
+              WebkitTextStroke: "0.35px rgba(60,45,20,0.35)",
+            }}>
+              <div>{LINE1.map((ch, i) => (
+                <span key={i} style={{ opacity: revealChar > i ? 1 : 0, transition: "opacity 0.07s ease", display: "inline" }}>{ch}</span>
+              ))}</div>
+              <div>{LINE2.map((ch, i) => (
+                <span key={i + 4} style={{ opacity: revealChar > i + 4 ? 1 : 0, transition: "opacity 0.07s ease", display: "inline" }}>{ch}</span>
+              ))}</div>
+            </h1>
+          )}
+          {/* ライトスイープ（弱め・ロゴ時はさらに弱い） */}
+          {swept && !titleLogo && (
             <div style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              pointerEvents: 'none', overflow: 'hidden',
+              position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+              pointerEvents: "none", overflow: "hidden",
             }}>
               <div style={{
-                position: 'absolute', top: 0, width: '55%', height: '100%',
-                background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',
-                animation: 'title-sweep 0.65s ease forwards',
+                position: "absolute", top: 0, width: "50%", height: "100%",
+                background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)",
+                animation: "title-sweep 0.65s ease forwards",
               }} />
             </div>
           )}
@@ -1503,7 +1776,7 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
           display:'flex', alignItems:'center', gap:8, width:'76%',
         }}>
           <div style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,#c9a227)' }} />
-          <span style={{ fontSize:16, filter:'drop-shadow(0 0 5px #ffd700)' }}>|</span>
+          <span style={{ fontSize: 16, color: "#9a7b2a", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>|</span>
           <div style={{ flex:1, height:1, background:'linear-gradient(90deg,#c9a227,transparent)' }} />
         </div>
 
@@ -1527,18 +1800,18 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
               padding:'13px 0', width:'100%', cursor:'pointer',
               background:'linear-gradient(135deg,rgba(201,162,39,0.17),rgba(201,162,39,0.05))',
               border:'2px solid #c9a227', color:'#f0d060',
-              boxShadow:'0 0 16px rgba(201,162,39,0.3)',
+              boxShadow: "0 2px 10px rgba(0,0,0,0.45)",
             }}>▶ つづきから</button>
           )}
           <button onClick={handleStart} style={{
             fontFamily: DOT, fontSize:12, letterSpacing:'0.2em',
             padding:'13px 0', width:'100%', cursor:'pointer',
             background: blink
-              ? 'linear-gradient(135deg,rgba(255,255,255,0.13),rgba(255,255,255,0.03))'
+              ? 'linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))'
               : 'rgba(0,0,0,0.01)',
-            border: `2px solid ${blink ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.22)'}`,
-            color: blink ? '#fff' : 'rgba(255,255,255,0.28)',
-            boxShadow: blink ? '0 0 20px rgba(255,255,255,0.18)' : 'none',
+            border: `2px solid ${blink ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.2)'}`,
+            color: blink ? '#f0f0f0' : 'rgba(255,255,255,0.32)',
+            boxShadow: blink ? '0 2px 12px rgba(0,0,0,0.35)' : 'none',
             transition: 'all 0.3s ease',
           }}>▶ はじめる</button>
         </div>
@@ -2243,7 +2516,14 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
                 {isPlayer
                   ? <HeroSprite gender={player.gender} direction={intDir} animStep={animStep} size={TS - 2} />
                   : npc
-                    ? (() => { const p = (NPC_PALETTE[interiorType] ?? {})[npc.eventKey]; return <NpcSprite bodyColor={p?.body ?? "#a3e635"} hairColor={p?.hair ?? "#1a0a00"} size={TS - 2} />; })()
+                    ? (() => {
+                      const p = (NPC_PALETTE[interiorType] ?? {})[npc.eventKey];
+                      const sz = TS - 2;
+                      if (interiorType === "catVillage") {
+                        return <CatNpcSprite furColor={p?.body ?? "#fca5a5"} markColor={p?.hair ?? "#7c2d12"} size={sz} />;
+                      }
+                      return <NpcSprite bodyColor={p?.body ?? "#a3e635"} hairColor={p?.hair ?? "#1a0a00"} size={sz} />;
+                    })()
                     : tile === INT.CHEST
                       ? <InteriorTileIcon kind="chest" size={TS - 4} opened={chestOpened} />
                       : tile === INT.EXIT
@@ -2423,11 +2703,31 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     if (busy) return;
     setBusy(true);
     let newPHp = pHp, newEHp = enemy.curHp;
-    if (spell.effect === "heal")  { const g = spell.power; newPHp = Math.min(player.maxHp, pHp+g); setPHp(newPHp); addLog(`${spell.name}！ HPが ${g}　回復した！`); }
-    if (spell.effect === "fire")  { const d = spell.power + rng(0,5); newEHp = Math.max(0, enemy.curHp-d); setEnemy(e=>({...e,curHp:newEHp})); addLog(`${spell.name}！ ${enemy.name}に ${d}の　ダメージ！`); }
-    if (spell.effect === "wind")  { const d = spell.power + rng(0,8); newEHp = Math.max(0, enemy.curHp-d); setEnemy(e=>({...e,curHp:newEHp})); addLog(`${spell.name}！ ${enemy.name}に ${d}の　ダメージ！`); }
-    if (spell.effect === "sleep") { setSleeping(true); addLog(`${spell.name}！ ${enemy.name}は　ねむった！`); }
-    setPMp(m => m - spell.mp); setPhase("command");
+    if (spell.effect === "heal") {
+      const g = spell.power;
+      newPHp = Math.min(player.maxHp, pHp + g);
+      setPHp(newPHp);
+      addLog(`${spell.name}！ HPが ${g}　回復した！`);
+    } else if (spell.effect === "elem") {
+      const { damage, weak } = calcElementSpellDamage(spell, enemy);
+      newEHp = Math.max(0, enemy.curHp - damage);
+      setEnemy((e) => ({ ...e, curHp: newEHp }));
+      addLog(`${spell.name}！ ${enemy.name}に ${damage}の　ダメージ！${weak ? "　つよさばつぐん！" : ""}`);
+    } else if (spell.effect === "wind") {
+      const d = calcRawSpellDamage(spell.power, enemy);
+      newEHp = Math.max(0, enemy.curHp - d);
+      setEnemy((e) => ({ ...e, curHp: newEHp }));
+      addLog(`${spell.name}！ ${enemy.name}に ${d}の　ダメージ！`);
+    } else if (spell.effect === "sleep") {
+      if (enemy.id === 38) {
+        addLog(`${spell.name}！　ドランゴには　きかなかった！`);
+      } else {
+        setSleeping(true);
+        addLog(`${spell.name}！ ${enemy.name}は　ねむった！`);
+      }
+    }
+    setPMp((m) => m - spell.mp);
+    setPhase("command");
     if (newEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp: newPHp, pMp: pMp-spell.mp }); }, 320);
     setTimeout(() => {
       const n = doEnemyTurn(newPHp);
@@ -2520,7 +2820,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
         )
       )}
       {phase === "spell" && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-1">
           <p className="text-xs text-center text-blue-300">── じゅもんを　えらべ ──</p>
           {SPELLS.filter(s => !s.secret || player.nazoSpellLearned).map(s => (
             <button key={s.name} className={`border border-blue-600 py-2 text-xs flex justify-between px-4 ${pMp<s.mp?"opacity-40":""}`}

@@ -59,11 +59,31 @@ function App() {
     setShowInfo(false);
   }, [player]);
 
-  // タッチスクロール防止
+  // タッチスクロール防止（iOS: touchstart で一律 preventDefault すると <button> の合成 click が来ずタップ不能になる）
   useEffect(() => {
     let lastTouchEnd = 0;
-    const onTE = (e) => { const now = Date.now(); if (now - lastTouchEnd <= 300) e.preventDefault(); lastTouchEnd = now; };
-    const onTM = (e) => { if (gameFrameRef.current?.contains(e.target)) e.preventDefault(); };
+    const touchEl = (e) => {
+      const t = e.target;
+      if (t instanceof Element) return t;
+      if (t && t.parentElement) return t.parentElement;
+      return null;
+    };
+    const isClickableTouchTarget = (el) => {
+      if (!el || !gameFrameRef.current?.contains(el)) return false;
+      return !!el.closest(
+        'button, a[href], input, select, textarea, label, [role="button"], [tabindex="0"]',
+      );
+    };
+    const onTE = (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) e.preventDefault();
+      lastTouchEnd = now;
+    };
+    const onTM = (e) => {
+      if (!gameFrameRef.current?.contains(e.target)) return;
+      if (isClickableTouchTarget(touchEl(e))) return;
+      e.preventDefault();
+    };
     document.addEventListener("touchstart", onTM, { passive: false });
     document.addEventListener("touchend", onTE, { passive: false });
     document.addEventListener("touchmove", onTM, { passive: false });
@@ -257,7 +277,7 @@ function App() {
   const handlePrologueDone = () => {
     setPlayer(p => {
       const v = new Set();
-      v.add(`${Math.floor(MAP_SIZE/2)},${Math.floor(MAP_SIZE/2)}`);
+      v.add(`${p.pos.y},${p.pos.x}`);
       return { ...p, visited: v };
     });
     setScreen(SCREEN.MAP);

@@ -328,6 +328,46 @@ function generateMapGrid() {
 
 const MAP_GRID = generateMapGrid();
 
+/** 新ゲーム開始位置：はじまりの村の周囲で海・湖以外。草原→森→他の順で優先。 */
+function findNewGameStartPosition() {
+  const vx = SPECIAL_POS.village.x;
+  const vy = SPECIAL_POS.village.y;
+  const tileRank = (t) => (
+    t === TILE.GRASS ? 0
+      : t === TILE.FOREST ? 1
+        : t === TILE.DESERT ? 2
+          : t === TILE.MOUNTAIN ? 3
+            : t === TILE.BRIDGE ? 4
+              : t === TILE.WATER ? 5
+                : t === TILE.TOWN ? 6
+                  : (t === TILE.SCHOOL || t === TILE.HOME || t === TILE.CAVE) ? 7
+                    : 8
+  );
+  let best = { x: vx, y: Math.min(vy + 1, MAP_SIZE - 1) };
+  let bestRank = 99;
+  for (let ring = 1; ring <= 12; ring++) {
+    for (let dy = -ring; dy <= ring; dy++) {
+      for (let dx = -ring; dx <= ring; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        const x = vx + dx;
+        const y = vy + dy;
+        if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) continue;
+        if (x === vx && y === vy) continue;
+        const t = MAP_GRID[y][x];
+        if (t === TILE.SEA || t === TILE.LAKE) continue;
+        const r = tileRank(t);
+        if (r < bestRank) {
+          bestRank = r;
+          best = { x, y };
+          if (r === 0) return best;
+        }
+      }
+    }
+    if (bestRank <= 1) return best;
+  }
+  return best;
+}
+
 // ─── SIGN MAP（道標：各特殊地点の近傍に1本だけ配置）──────────────────────────
 // key="y,x" → { name, arrow }
 const SIGN_MAP = (() => {
@@ -1091,6 +1131,7 @@ const LOCATION_EVENTS = {
 };
 
 // ─── ENEMIES ──────────────────────────────────────────────────────────────────
+// 戦闘の敵スプライト: `images/enemy-{id}.png`（id は下表 0〜39）。タイトル等には使わない。欠落時は EnemySprite がベクターへフォールバック。
 // magic: { name, type:"dmg"|"heal", power } / drop: { id:"herb"|"potion", rate }
 const ENEMIES = [
   // ─ Tier1: 初心者 (dist < 14, Lv1-2) ─
@@ -1100,7 +1141,7 @@ const ENEMIES = [
   { id: 3,  name:"カエル",         hp: 9, atk: 3, def: 0, exp: 5, gold: 3 },
   { id: 4,  name:"こうもり",       hp: 7, atk: 3, def: 0, exp: 4, gold: 2, drop:{ id:"herb",   rate:0.3 } },
   { id: 5,  name:"ミニスライム",   hp: 5, atk: 1, def: 0, exp: 3, gold: 1 },
-  { id: 6,  name:"どくいもむし",   hp:10, atk: 2, def: 0, exp: 5, gold: 3, poison:true, poisonRate:0.30, magic:{ name:"どくけむり",   type:"dmg", power: 4 } },
+  { id: 6,  name:"どくいもむし",   hp:10, atk: 2, def: 0, exp: 5, gold: 3, poison:true, poisonRate:0.25, magic:{ name:"どくけむり",   type:"dmg", power: 4 } },
   { id: 7,  name:"いたずらゴースト",hp: 8, atk: 4, def: 0, exp: 5, gold: 3, magic:{ name:"おどかし",     type:"dmg", power: 6 } },
   // ─ Tier2: 中堅 (dist 14-22, Lv3-5) ─
   { id: 8,  name:"おばけきのこ",   hp:18, atk: 7, def: 1, exp:10, gold: 5 },
@@ -1138,9 +1179,9 @@ const ENEMIES = [
   { id:36,  name:"ダークナイト",   hp:65, atk:23, def:10, exp:48, gold:30 },
   { id:37,  name:"あんこくまじゅつし",hp:55, atk:22, def: 8, exp:45, gold:28, magic:{ name:"じごくのほのお",type:"dmg", power:18 }, drop:{ id:"potion", rate:0.25 } },
   // ─ ボス (洞窟のみ) ─
-  { id:38,  name:"ドランゴ",       hp:216, atk:24, def:10, exp:75, gold:50, magic:[
-    { name:"やみのいかずち", type:"dmg", power:18 },
-    { name:"闇の吐息",     type:"dmg", power:22 },
+  { id:38,  name:"ドランゴ",       hp:200, atk:24, def:10, exp:75, gold:50, magic:[
+    { name:"やみのいかずち", type:"dmg", power:17 },
+    { name:"闇の吐息",     type:"dmg", power:20 },
   ] },
   // ─ 猫の森のレア枠 ─
   { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:0.14 } },
@@ -1149,6 +1190,8 @@ const ENEMIES = [
 const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 const E = (id) => ENEMY_BY_ID[id];
 const BOSS_ENEMY = E(38);
+/** 戦闘用。PNG 未配置の id はベクター（`images/enemy-{id}.png` で上書き）。参照用: id→名前 */
+const ENEMY_VECTOR_FALLBACK_NAMES = Object.fromEntries(ENEMIES.map((e) => [e.id, e.name]));
 
 // ★ Modern JS ① crypto.getRandomValues() — 暗号強度の乱数生成
 function rng(min, max) {
@@ -1204,12 +1247,48 @@ function getEnemyForZone(tile, pos) {
   return [E(36), E(37)][rng(0, 1)];
 }
 
+// 属性呪文の弱点（敵ID）。小さな固定ボーナスのみ（全体バランスを崩さない）
+const ELEMENT_SPELL_WEAK = {
+  fire:    [14, 19, 22, 29],
+  water:   [11, 33, 34],
+  thunder: [12, 24, 25, 27, 28],
+};
+
+/** プレイヤー向け属性ダメージ（effect:"elem" の呪文用） */
+function calcElementSpellDamage(spell, enemy) {
+  if (spell.effect !== "elem") return { damage: 0, weak: false };
+  let base = spell.power + rng(-1, 2);
+  const weakList = ELEMENT_SPELL_WEAK[spell.elem] || [];
+  let weak = false;
+  if (weakList.includes(enemy.id)) {
+    weak = true;
+    base += spell.tier === 1 ? 2 : spell.tier === 2 ? 3 : 4;
+  }
+  const defMit = Math.floor((enemy.def ?? 0) / (spell.tier >= 3 ? 2 : 3));
+  return { damage: Math.max(1, base - defMit), weak };
+}
+
+/** 風秘術など単体威力呪文（防御で軽減） */
+function calcRawSpellDamage(power, enemy) {
+  const base = power + rng(-1, 3);
+  const defMit = Math.floor((enemy.def ?? 0) / 2);
+  return Math.max(1, base - defMit);
+}
+
+// 回復・睡眠＋ 火/水/雷 各3段（弱いほどMP安い）＋謎の村秘術
 const SPELLS = [
-  { name: "ひかりのいぶき", mp: 3, effect: "heal",  power: 28, msg: "体力が回復した！" },
-  { name: "あかつきのひ",   mp: 4, effect: "fire",  power: 15, msg: "炎が燃えさかる！" },
+  { name: "ひかりのいぶき", mp: 3, effect: "heal",  power: 26, msg: "体力が回復した！" },
   { name: "ゆめしずく",     mp: 3, effect: "sleep", power:  0, msg: "眠りの呪文！" },
-  // 謎の村クリア報酬（仙人マンの秘術）
-  { name: "せんにんのかぜ", mp: 6, effect: "wind",  power: 25, msg: "仙人の風が吹き荒れる！", secret: true },
+  { name: "ひのこ",         mp: 2, effect: "elem", elem: "fire",    tier: 1, power:  7 },
+  { name: "かえん",         mp: 4, effect: "elem", elem: "fire",    tier: 2, power: 13 },
+  { name: "ごうか",         mp: 6, effect: "elem", elem: "fire",    tier: 3, power: 19 },
+  { name: "みずたま",       mp: 2, effect: "elem", elem: "water",   tier: 1, power:  7 },
+  { name: "あわなだれ",     mp: 4, effect: "elem", elem: "water",   tier: 2, power: 13 },
+  { name: "せいすい",       mp: 6, effect: "elem", elem: "water",   tier: 3, power: 19 },
+  { name: "びりびり",       mp: 2, effect: "elem", elem: "thunder", tier: 1, power:  7 },
+  { name: "いなずま",       mp: 4, effect: "elem", elem: "thunder", tier: 2, power: 13 },
+  { name: "らいめい",       mp: 6, effect: "elem", elem: "thunder", tier: 3, power: 19 },
+  { name: "せんにんのかぜ", mp: 6, effect: "wind",  power: 22, msg: "仙人の風が吹き荒れる！", secret: true },
 ];
 
 // ─── PLAYER ───────────────────────────────────────────────────────────────────
@@ -1217,10 +1296,10 @@ function makePlayer(name, gender) {
   return {
     name, gender,
     hp: 20, maxHp: 20,        // ← 弱体化（元30）
-    mp:  8, maxMp:  8,        // ← 弱体化（元12）
+    mp: 10, maxMp: 10,        // 属性呪文を少し使える程度（序盤でも2〜3ターン）
     atk: 5, def: 2,           // ← 弱体化（元atk:8 def:4）
     exp: 0, level: 1, gold: 30,
-    pos: { x: Math.floor(MAP_SIZE/2), y: Math.floor(MAP_SIZE/2) },
+    pos: findNewGameStartPosition(),
     visited: new Set(),
     direction: "down",
     animStep: 0,
