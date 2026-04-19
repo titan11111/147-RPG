@@ -546,6 +546,14 @@ function TileCanvas({ tile, size = 34 }) {
   );
 }
 
+// 戦闘スプライト: 通常は `./images/enemy-{id}.png`。未リネームの差し替えPNGがある id のみここでファイル名を指定。
+const ENEMY_BATTLE_IMAGE_FILE = {
+  5:  "Remove_background_to_create_transparent_PNG-1776601649917.png",  // ミニスライム
+  19: "Remove_background_to_create_transparent_PNG-1776601637501.png",  // もりのせいれい
+  22: "Remove_background_to_create_transparent_PNG-1776601643472.png",  // まよいぼたる
+  35: "Remove_background_to_create_transparent_PNG-1776601602724.png",  // ほねこうもり
+};
+
 function EnemySprite({ enemy, size = 72, flash = false }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -564,7 +572,8 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
       const cache = EnemySprite.__imgCache;
       if (cache.has(id)) return cache.get(id);
       const img = new Image();
-      img.src = `./images/enemy-${id}.png`;
+      const file = ENEMY_BATTLE_IMAGE_FILE[id] ?? `enemy-${id}.png`;
+      img.src = `./images/${file}`;
       cache.set(id, img);
       return img;
     };
