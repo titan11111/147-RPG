@@ -35,6 +35,7 @@ const TILE = {
   GRASS: "grass", TOWN: "town", SCHOOL: "school", CAVE: "cave", HOME: "home",
   FOREST: "forest", WATER: "water", MOUNTAIN: "mountain", SEA: "sea",
   LAKE: "lake", BRIDGE: "bridge", DESERT: "desert",
+  SNOW: "snow", ONSEN: "onsen",
 };
 
 const INT = {
@@ -56,6 +57,8 @@ const TILE_STYLE = {
   [TILE.SCHOOL]:   "linear-gradient(135deg,#ffe066,#ffd43b)",
   [TILE.HOME]:     "linear-gradient(135deg,#ffd8a8,#ffc078)",
   [TILE.CAVE]:     "linear-gradient(135deg,#868e96,#495057)",
+  [TILE.SNOW]:     "linear-gradient(135deg,#e8f4f8,#b8d4e8)",
+  [TILE.ONSEN]:    "linear-gradient(135deg,#80deea,#4dd0e1)",
 };
 
 
@@ -66,6 +69,18 @@ const INT_STYLE = {
   [INT.BOARD]:    "#2f5d36", [INT.COUNTER]:  "#6f5440",
   [INT.FOUNTAIN]: "#3b82f6", [INT.CHEST]:    "#8b5a2b",
   [INT.STAIRS_DOWN]: "#6b7280", [INT.STAIRS_UP]: "#94a3b8",
+};
+
+// 地底洞窟専用タイルスタイル（暗い土・岩）
+const UNDERGROUND_INT_STYLE = {
+  [INT.FLOOR]:    "#150f08",
+  [INT.WALL]:     "#0a0704",
+  [INT.EXIT]:     "#22c55e",
+  [INT.NPC]:      "#150f08",
+  [INT.FOUNTAIN]: "#0d1a08",
+  [INT.CHEST]:    "#3d2010",
+  [INT.BOARD]:    "#120a04",
+  [INT.SHELF]:    "#1f1008",
 };
 
 // 洞窟専用タイルスタイル（暗い岩・土・地下水）
@@ -92,6 +107,7 @@ const SPECIAL_POS = {
   manabiVillage:{ x:  2, y:  2 },   // dist=46 世界の端（まなびの村）
   nazoVillage:  { x:  5, y: 45 },   // dist=40 謎の村（仙人マンたちの村）
   catVillage:   { x: 46, y:  6 },   // dist=40 猫の村
+  onsen:        { x: 40, y: 36 },   // dist=30 雪原の露天温泉（地下への入口）
 };
 
 const WORLD_MARKERS = {
@@ -104,6 +120,7 @@ const WORLD_MARKERS = {
   [`${SPECIAL_POS.manabiVillage.y},${SPECIAL_POS.manabiVillage.x}`]: "village",
   [`${SPECIAL_POS.nazoVillage.y},${SPECIAL_POS.nazoVillage.x}`]: "mysticVillage",
   [`${SPECIAL_POS.catVillage.y},${SPECIAL_POS.catVillage.x}`]: "catVillage",
+  [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: "onsen",
 };
 
 function getWorldLandmarkType(tile, x, y) {
@@ -120,7 +137,7 @@ function getWorldLandmarkType(tile, x, y) {
 const SCREEN = {
   TITLE: "title", NAME: "name", GENDER: "gender", PROLOGUE: "prologue",
   MAP: "map", INTERIOR: "interior", EVENT: "event", BATTLE: "battle",
-  GAMEOVER: "gameover", ENDING: "ending",
+  GAMEOVER: "gameover", ENDING: "ending", MERCHANT: "merchant",
 };
 
 function getEncounterCounter() {
@@ -215,6 +232,9 @@ const ITEMS = {
   mega_potion: { name:"まんたんのくすり", heal:80 },
   antidote:    { name:"どくけしそう", heal:0, curePoison:true },
   neko_konnyaku: { name:"ねこねここんにゃく", heal:0 },
+  manabi_proof:  { name:"まなびのあかし",   heal:0, keyItem:true },
+  ancient_key:   { name:"ふるびたかぎ",     heal:0, keyItem:true },
+  dragon_scale:  { name:"ドラゴンのウロコ", heal:0, keyItem:true },
 };
 
 // ─── NPC PALETTE ──────────────────────────────────────────────────────────────
@@ -252,7 +272,7 @@ const NPC_PALETTE = {
     "2,10": { body:"#60a5fa", hair:"#1e3a8a" }, // 算数先生（青・論理）
     "5,2":  { body:"#4ade80", hair:"#14532d" }, // 理科先生（緑・自然）
     "5,8":  { body:"#fb923c", hair:"#7c2d12" }, // 社会先生（オレンジ・地図）
-    "8,2":  { body:"#facc15", hair:"#713f12" }, // ポケモンマスター（黄）
+    "8,2":  { body:"#facc15", hair:"#713f12" }, // ヨミコ（読書家・黄）
     "8,10": { body:"#e2e8f0", hair:"#64748b" }, // 村の長老（白・グレー）
   },
   nazoVillage: {
@@ -268,6 +288,12 @@ const NPC_PALETTE = {
     "2,8": { body:"#fde68a", hair:"#92400e" },
     "8,3": { body:"#93c5fd", hair:"#1e3a8a" },
     "8,6": { body:"#a7f3d0", hair:"#065f46" },
+  },
+  underground: {
+    "2,2":  { body:"#78716c", hair:"#292524" }, // 偵察兵A（灰土色）
+    "2,10": { body:"#57534e", hair:"#1c1917" }, // 兵士（濃い灰）
+    "8,2":  { body:"#a8a29e", hair:"#44403c" }, // 古老（薄い灰・老齢）
+    "12,5": { body:"#b45309", hair:"#451a03" }, // リーダーガイア（土の金・権威）
   },
 };
 
@@ -323,6 +349,20 @@ function generateMapGrid() {
   grid[SPECIAL_POS.manabiVillage.y][SPECIAL_POS.manabiVillage.x] = TILE.TOWN;
   grid[SPECIAL_POS.nazoVillage.y][SPECIAL_POS.nazoVillage.x]    = TILE.TOWN;
   grid[SPECIAL_POS.catVillage.y][SPECIAL_POS.catVillage.x]      = TILE.TOWN;
+
+  // ─ 雪原生成（洞窟周辺をSNOWタイルで覆う）────────────────────────────────
+  const FIXED_TILES = new Set([TILE.SEA, TILE.LAKE, TILE.WATER, TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE]);
+  const cx = SPECIAL_POS.cave.x, cy = SPECIAL_POS.cave.y;
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (FIXED_TILES.has(grid[y][x])) continue;
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      if (dist <= 13) grid[y][x] = TILE.SNOW;
+      else if (dist <= 20 && y > 26 && x > 28 && Math.random() < 0.50) grid[y][x] = TILE.SNOW;
+    }
+  }
+  grid[SPECIAL_POS.onsen.y][SPECIAL_POS.onsen.x] = TILE.ONSEN;
+
   return grid;
 }
 
@@ -381,6 +421,7 @@ const SIGN_MAP = (() => {
     { pos: SPECIAL_POS.manabiVillage, name: 'まなびの村' },
     { pos: SPECIAL_POS.nazoVillage,   name: '謎の村' },
     { pos: SPECIAL_POS.catVillage,    name: '猫の村' },
+    { pos: SPECIAL_POS.onsen,         name: '雪原の温泉' },
   ];
   // 近すぎる案内を避けるため、まず遠距離(6〜8マス)を優先して配置する。
   // 迷ったときに見つける「道しるべ」として機能させる。
@@ -547,7 +588,7 @@ const MANABI_VILLAGE_IMAP = parseIntMap([
   "W.N..F..N..W",  // row 5: [5,2]=理科先生 [5,8]=社会先生 泉[5,5]
   "WWWWWW.WWWWW",  // row 6: 仕切り
   "W..........W",  // row 7
-  "W.N.......NW",  // row 8: [8,2]=ポケモンマスター [8,10]=長老
+  "W.N.......NW",  // row 8: [8,2]=ヨミコ（読書家）  [8,10]=長老
   "W..........W",  // row 9
   "W....E.....W",  // row 10: 出口
   "WWWWWWWWWWWW",  // row 11
@@ -567,6 +608,26 @@ const NAZO_VILLAGE_IMAP = parseIntMap([
   "W..........W",  // row 9
   "W....E.....W",  // row 10: 出口
   "WWWWWWWWWWWW",  // row 11
+]);
+
+// ─── 地下フィールド（ガイア団の地下基地）────────────────────────────────────────
+// 温泉の底を抜けて落下した先。地底人（ガイア団）の集落。
+const UNDERGROUND_IMAP = parseIntMap([
+  "WWWWWWWWWWWWWW",  // row 0
+  "W............W",  // row 1
+  "W.N.......N..W",  // row 2: [2,2]=偵察兵A  [2,10]=兵士
+  "W............W",  // row 3
+  "W.....F......W",  // row 4: [4,6]=地底の泉
+  "W............W",  // row 5
+  "WWWWW.WWWWWWWW",  // row 6: 仕切り（gap at col 5）
+  "W............W",  // row 7
+  "W.N..........W",  // row 8: [8,2]=古老
+  "W............W",  // row 9
+  "WWWWWWWWWWWW.W",  // row 10: 仕切り（gap at col 12）
+  "W............W",  // row 11
+  "W....N..T....W",  // row 12: [12,5]=リーダーガイア  [12,8]=宝箱
+  "W.....E......W",  // row 13: 出口
+  "WWWWWWWWWWWWWW",  // row 14
 ]);
 
 // ─── 猫の村マップ ───────────────────────────────────────────────────────────────
@@ -589,7 +650,7 @@ const INTERIOR_MAPS = {
   village: VILLAGE_IMAP, town: TOWN_IMAP, school: SCHOOL_IMAP,
   castle: CASTLE_IMAP,
   cave: CAVE_IMAP, manabiVillage: MANABI_VILLAGE_IMAP, nazoVillage: NAZO_VILLAGE_IMAP,
-  catVillage: CAT_VILLAGE_IMAP,
+  catVillage: CAT_VILLAGE_IMAP, underground: UNDERGROUND_IMAP,
 };
 
 const CAVE_EVENTS_BY_FLOOR = {
@@ -824,13 +885,13 @@ const INTERIOR_EVENTS = {
       "人が　集まる場所には　必ず　理由がある。",
       "地形、資源、交通……　社会は　全部　つながっているんだ。",
     ]},
-    // ポケモンマスター
+    // 小5の読書家
     "8,2": { messages: [
-      "ポケモンマスター：「やあ！　待ってたよ！",
-      "ポケモンって　実は　理科の　教科書なんだ！",
-      "カイオーガは　水を　作り出す……海洋生態系だね。",
-      "グラードンは　大地を　広げる……プレートテクトニクスだ。",
-      "好きなことから　学ぶのが　一番　強い！",
+      "ヨミコ（読書家）：「あ、旅人だ！　本、読んでる？",
+      "わたし、ここで　ずっと　本を　読んでるの。",
+      "好きな本は　『銀河鉄道の夜』と　『ハチドリのひとしずく』。",
+      "「自分にできる　小さなことを　やり続けること」って　いいよね。",
+      "旅も　一歩ずつ、だよ。　がんばって！",
       "HPが　10　回復した！",
     ], heal: 10 },
     // 村の長老
@@ -840,8 +901,9 @@ const INTERIOR_EVENTS = {
       "全ては　「知らないことへの　恐れ」を　なくすための　旅だ。",
       "学ぶとは　恐れを　越えること。",
       "おまえは　すでに　勇者だ。",
-      "まなびの旅は　まだ　続く。　行け。",
-    ]},
+      "この　「まなびのあかし」を　持っていけ。",
+      "……世界の　果てまで　来た　証じゃ。",
+    ], giveItem: "manabi_proof" },
     // 黒板（左）
     "1,2": { messages: [
       "黒板に　書いてある：",
@@ -934,6 +996,46 @@ const INTERIOR_EVENTS = {
     },
     "4,5": { messages: ["猫の泉。丸い波紋が静かに広がっている。", "HPが　8　回復した！"], heal: 8 },
   },
+  // ─── 地下フィールド（ガイア団基地）────────────────────────────────────────
+  underground: {
+    "2,2": { messages: [
+      "偵察兵：「……！　人間か？！　いや……　悪い気配じゃない。」",
+      "ここは　地底に住む者たちの　隠れ家だ。",
+      "落とし穴から　来たんだろ。",
+      "温泉の底が　抜けることは　知られていない。　安心しろ。",
+      "奥に　リーダーがいる。　話を　聞いてもらえ。",
+    ]},
+    "2,10": { messages: [
+      "兵士：「よそ者か。　……まあ　いい。",
+      "我らガイア団は、ドランゴに　奪われた　地上を　取り戻すため　戦っている。",
+      "地上には　3つのあかしが　散っているはずだ。",
+      "まなびのあかし・ふるびたかぎ・ドラゴンのウロコ。",
+      "それを揃えれば　洞窟の　封印が　解ける。",
+    ]},
+    "4,6": { messages: [
+      "地底から　湧き出る　不思議な泉。",
+      "仄かに　光っている……",
+      "HPと　MPが　全回復した！",
+    ], heal: 999 },
+    "8,2": { messages: [
+      "古老：「……ずいぶん　遠くから　来たのう。",
+      "ドランゴが　現れたのは　百年前じゃった。",
+      "あやつは　光を　憎む。　地上の　温もりを　奪いたがる。",
+      "かつて　我らは　地上に住んでいた……。",
+      "今は　地の底に　潜って　牙を　研いでおる。",
+      "……おぬしが　希望だ。",
+    ]},
+    "12,5": { messages: [
+      "ガイア（リーダー）：「……よく　来た。　地上の　旅人よ。",
+      "我らは　長年　ドランゴと　戦い続けてきた。",
+      "あやつの　急所は　洞窟の　最深部　にある。",
+      "3つのあかしを　揃え、洞窟を　進め。",
+      "最奥で　ドランゴの　意識体に　触れることが　できる。",
+      "……頼んだぞ。地上の　光を　取り戻してくれ。",
+      "これを　持っていけ。　地底の　加護を　授けよう。",
+      "HPが　全回復した！",
+    ], heal: 999 },
+  },
   school: {
     "2,2": { messages: [
       "ミナミ先生：「よく　来た。この世界に　来たからには　やることがある。",
@@ -1003,6 +1105,9 @@ const INTERIOR_TREASURES = {
   town: {
     "6,7": { id: "town:6,7", itemId: "potion", amount: 1, messages: ["宝箱を　あけた！", "キズぐすりを　てにいれた！"] },
     "6,8": { id: "town:6,8", gold: 35, messages: ["宝箱を　あけた！", "35ゴールドを　てにいれた！"] },
+  },
+  underground: {
+    "12,8": { id: "underground:12,8", itemId: "mega_potion", amount: 2, messages: ["石の宝箱を　あけた！", "まんたんのくすり×2を　てにいれた！"] },
   },
 };
 
@@ -1128,6 +1233,18 @@ const LOCATION_EVENTS = {
     ],
     interior: "catVillage",
   },
+  [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: {
+    name: "雪原の露天温泉",
+    messages: [
+      "もうもうと　湯気が　立ち上っている。",
+      "雪に囲まれた　露天温泉だ。",
+      "足を　踏み入れると……",
+      "──　底が　ぬけた！",
+      "……どこかへ　落ちていく……",
+      "……気がつくと　地下に　いた。",
+    ],
+    interior: "underground",
+  },
 };
 
 // ─── ENEMIES ──────────────────────────────────────────────────────────────────
@@ -1185,6 +1302,8 @@ const ENEMIES = [
   ] },
   // ─ 猫の森のレア枠 ─
   { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:0.14 } },
+  // ─ レアエンカウント ─
+  { id:40,  name:"メタにゃん",     hp:3,  atk:5,  def:99, exp:120, gold:1, flees:true },
 ];
 
 const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
@@ -1210,29 +1329,51 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 // Zone D  dist 20〜25  : Lv4〜6    おばけきのこ・ゴブリン・アイスインプ（学校〜家）
 // Zone E  dist 26〜31  : Lv6〜9    ツチモグラ・まどうし・ドクロナイト（家〜洞窟）
 // Zone F  dist 32+     : Lv9+      ダークナイト・あんこくまじゅつし（洞窟深部）
-function getEnemyForZone(tile, pos) {
+function getEnemyForZone(tile, pos, isNight = false) {
   const cx = Math.floor(MAP_SIZE / 2), cy = Math.floor(MAP_SIZE / 2);
   const dist = Math.abs(pos.x - cx) + Math.abs(pos.y - cy);
 
   // ── 山岳タイル：距離で3段階 ──
   if (tile === TILE.MOUNTAIN) {
+    if (isNight) {
+      if (dist > 28) return [E(26), E(29), E(25)][rng(0, 2)];
+      if (dist > 20) return [E(25), E(28), E(29)][rng(0, 2)];
+      return [E(24), E(25), E(27)][rng(0, 2)];
+    }
     if (dist > 28) return [E(26), E(29)][rng(0, 1)];
     if (dist > 20) return [E(25), E(28)][rng(0, 1)];
     return [E(24), E(27)][rng(0, 1)];
   }
   // ── 砂漠タイル：固有モンスター ──
   if (tile === TILE.DESERT) {
+    if (isNight) return [E(31), E(34), E(35), E(32), E(30)][rng(0, 4)];
     return [E(30), E(31), E(32), E(33), E(34), E(35)][rng(0, 5)];
   }
   // ── 森タイル：距離で2段階 ──
   if (tile === TILE.FOREST) {
+    if (isNight) {
+      const pool = dist > 24
+        ? [E(18), E(19), E(22), E(23), E(21)]
+        : [E(18), E(20), E(22), E(23), E(39)];
+      return pool[rng(0, pool.length - 1)];
+    }
     const pool = dist > 24
       ? [E(18), E(19), E(21), E(23), E(39)]
       : [E(16), E(17), E(20), E(22), E(39)];
     return pool[rng(0, pool.length - 1)];
   }
 
-  // ── 草原・その他：6段階ゾーン ──
+  // ── 草原・雪原・その他：6段階ゾーン ──
+  // 夜は不死・闇系モンスターが出現
+  if (isNight) {
+    if (dist <=  5) return [E(4),  E(7) ][rng(0, 1)];
+    if (dist <= 12) return [E(4),  E(7),  E(2),  E(6) ][rng(0, 3)];
+    if (dist <= 19) return [E(6),  E(7),  E(9),  E(13)][rng(0, 3)];
+    if (dist <= 25) return [E(12), E(13), E(11), E(14)][rng(0, 3)];
+    if (dist <= 31) { if (rng(1, 16) === 1) return E(40); return [E(12), E(13), E(35), E(36)][rng(0, 3)]; }
+    if (rng(1, 12) === 1) return E(40);
+    return [E(36), E(37)][rng(0, 1)];
+  }
   // Zone A: スタート直後の超安全地帯（魔法なし・物理のみ）
   if (dist <=  5) return [E(1), E(5)][rng(0, 1)];
   // Zone B: 〜町までの道中（低atk・魔法なし）
@@ -1241,9 +1382,10 @@ function getEnemyForZone(tile, pos) {
   if (dist <= 19) return [E(2), E(3), E(6), E(7)][rng(0, 3)];
   // Zone D: 学校〜家（中堅前半・装備強化後想定）
   if (dist <= 25) return [E(8), E(9), E(14), E(15)][rng(0, 3)];
-  // Zone E: 家〜洞窟（中堅後半・高atk・高def）
-  if (dist <= 31) return [E(10), E(11), E(12), E(13)][rng(0, 3)];
-  // Zone F: 洞窟深部（最終ゾーン・ドランゴはランダム出現しない）
+  // Zone E: 家〜洞窟（中堅後半）メタにゃん 1/16
+  if (dist <= 31) { if (rng(1, 16) === 1) return E(40); return [E(10), E(11), E(12), E(13)][rng(0, 3)]; }
+  // Zone F: 洞窟深部　メタにゃん 1/12
+  if (rng(1, 12) === 1) return E(40);
   return [E(36), E(37)][rng(0, 1)];
 }
 

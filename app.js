@@ -12,6 +12,7 @@ function App() {
   const [interiorType, setInteriorType] = useState(null);
   const [hasSave, setHasSave]         = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
+  const [isNight, setIsNight]         = useState(false);
   const gameFrameRef = useRef(null);
   const audioCtxRef  = useRef(null);
   const moveLockRef  = useRef(0);
@@ -37,6 +38,12 @@ function App() {
     };
     initRuntime();
     return () => { mounted = false; };
+  }, []);
+
+  // 昼夜サイクル：3分ごとに切り替え
+  useEffect(() => {
+    const id = setInterval(() => setIsNight(n => !n), 180000);
+    return () => clearInterval(id);
   }, []);
 
   // セーブ（visited は Set → Array に変換して保存）
@@ -115,6 +122,46 @@ function App() {
     }
     bgmModeRef.current = "";
     bgmTrackRef.current = "";
+  }, []);
+
+  const playLevelUpSound = useCallback(() => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtxRef.current;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const seq = [
+      { f: 523.25, t: 0 }, { f: 659.25, t: 0.12 }, { f: 783.99, t: 0.24 },
+      { f: 1046.50, t: 0.36 }, { f: 1318.50, t: 0.52 }, { f: 1568.00, t: 0.68 },
+    ];
+    seq.forEach(({ f, t }) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = "square";
+      o.frequency.setValueAtTime(f, now + t);
+      g.gain.setValueAtTime(0.001, now + t);
+      g.gain.exponentialRampToValueAtTime(0.07, now + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.18);
+      o.start(now + t); o.stop(now + t + 0.22);
+    });
+  }, []);
+
+  const playKeyItemSound = useCallback(() => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtxRef.current;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = "square";
+      o.frequency.setValueAtTime(freq, now + i * 0.14);
+      g.gain.setValueAtTime(0.001, now + i * 0.14);
+      g.gain.exponentialRampToValueAtTime(0.07, now + i * 0.14 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.14 + 0.38);
+      o.start(now + i * 0.14);
+      o.stop(now + i * 0.14 + 0.42);
+    });
   }, []);
 
   const playUiClick = useCallback((isStrong = false) => {
@@ -203,7 +250,7 @@ function App() {
       return;
     }
     if (screen === SCREEN.INTERIOR) {
-      if (["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage"].includes(interiorType || "")) {
+      if (["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground"].includes(interiorType || "")) {
         startBgm("town");
         return;
       }
@@ -231,7 +278,7 @@ function App() {
       }
       const scene = screen === SCREEN.BATTLE
         ? (isBoss ? "boss" : "battle")
-        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage"].includes(interiorType || ""))
+        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground"].includes(interiorType || ""))
           ? "town"
           : (screen === SCREEN.INTERIOR && interiorType === "cave")
             ? null
@@ -303,10 +350,10 @@ function App() {
       let moved = { ...prev, pos: { x: nx, y: ny }, visited: newVisited, direction: dir, animStep: prev.animStep + 1 };
 
       // DQ式エンカウント（歩数カウントダウン）
-      if ([TILE.GRASS, TILE.FOREST, TILE.DESERT, TILE.MOUNTAIN].includes(tile)) {
+      if ([TILE.GRASS, TILE.FOREST, TILE.DESERT, TILE.MOUNTAIN, TILE.SNOW].includes(tile)) {
         const newCounter = moved.encounterCounter - 1;
         if (newCounter <= 0) {
-          const enemy = getEnemyForZone(tile, { x: nx, y: ny });
+          const enemy = getEnemyForZone(tile, { x: nx, y: ny }, isNight);
           setTimeout(() => { setCurrentEnemy(enemy); setIsBoss(false); setScreen(SCREEN.BATTLE); }, 100);
           moved = { ...moved, encounterCounter: getEncounterCounter() };
         } else {
@@ -321,6 +368,22 @@ function App() {
     if (!player) return;
     const key = `${player.pos.y},${player.pos.x}`;
     if (!hasOwn(LOCATION_EVENTS, key)) return;
+    const caveKey = `${SPECIAL_POS.cave.y},${SPECIAL_POS.cave.x}`;
+    if (key === caveKey) {
+      const KEY_ITEMS = ["manabi_proof", "ancient_key", "dragon_scale"];
+      const ITEM_NAMES = { manabi_proof: "まなびのあかし", ancient_key: "ふるびたかぎ", dragon_scale: "ドラゴンのウロコ" };
+      const bag = player.bag || [];
+      const missing = KEY_ITEMS.filter(id => !bag.some(i => i.id === id && i.count > 0));
+      if (missing.length > 0) {
+        setCurrentEvent({ messages: [
+          "なにかが　この先を　阻んでいる……",
+          "3つの　あかしを　集めなければ　入れない。",
+          `まだ　持っていない：${missing.map(id => ITEM_NAMES[id]).join("・")}`,
+        ]});
+        setScreen(SCREEN.EVENT);
+        return;
+      }
+    }
     setCurrentEvent(LOCATION_EVENTS[key]);
     setScreen(SCREEN.EVENT);
   };
@@ -397,6 +460,7 @@ function App() {
 
   const handleWin = ({ exp, gold, pHp, pMp }) => {
     let dropMsg = null;
+    let levelUpInfo = null;
     setPlayer(prev => {
       let updated = { ...prev, hp: pHp, mp: pMp, exp: prev.exp + exp, gold: prev.gold + gold };
       const dr = currentEnemy.drop;
@@ -412,12 +476,22 @@ function App() {
           dropMsg = `${itemData.name}を　てにいれた！`;
         }
       }
+      const prevLevel = updated.level;
       updated = checkLevelUp(updated);
+      if (updated.level > prevLevel) {
+        levelUpInfo = { name: updated.name, level: updated.level };
+      }
       return updated;
     });
     if (isBoss) { setScreen(SCREEN.ENDING); return; }
     const msgs = [`${currentEnemy.name}を　たおした！`, `けいけんちを ${exp}　手に入れた！`, `${gold}ゴールドを　もらった！`];
     if (dropMsg) msgs.push(dropMsg);
+    if (levelUpInfo) {
+      msgs.push(`🌟 ${levelUpInfo.name}の　レベルが　あがった！`);
+      msgs.push(`　★ レベル ${levelUpInfo.level} に　なった！`);
+      msgs.push(`HP・MP・こうげきが　上がった！`);
+      setTimeout(() => playLevelUpSound(), 100);
+    }
     setPendingMsg(msgs);
     setScreen(SCREEN.MAP);
   };
@@ -456,7 +530,7 @@ function App() {
         {screen === SCREEN.GENDER   && <GenderScreen playerName={tempName} onConfirm={handleGenderConfirm} />}
         {screen === SCREEN.PROLOGUE && <PrologueScreen playerName={player?.name} onDone={handlePrologueDone} />}
         {screen === SCREEN.MAP      && player && (
-          <MapScreen player={player} onMove={handleMove} onInvestigate={handleInvestigate} onInfo={() => setShowInfo(true)} />
+          <MapScreen player={player} onMove={handleMove} onInvestigate={handleInvestigate} onInfo={() => setShowInfo(true)} isNight={isNight} />
         )}
         {screen === SCREEN.INTERIOR && player && interiorType && (
           <InteriorMapScreen
@@ -481,6 +555,19 @@ function App() {
               return { ...p, nazoFlags: [...flags, flagKey] };
             })}
             onLearnSpell={() => setPlayer(p => ({ ...p, nazoSpellLearned: true }))}
+            onGiveItem={(itemId) => {
+              if (!itemId) return;
+              setPlayer(p => {
+                if (!p) return p;
+                const itemData = ITEMS[itemId];
+                if (!itemData) return p;
+                const bag = [...(p.bag || [])];
+                if (bag.some(i => i.id === itemId)) return p;
+                bag.push({ id: itemId, name: itemData.name, heal: 0, count: 1 });
+                return { ...p, bag: sortBagItems(bag) };
+              });
+              playKeyItemSound();
+            }}
           />
         )}
         {screen === SCREEN.EVENT    && currentEvent && (

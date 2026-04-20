@@ -3,6 +3,7 @@ const MINI_COLOR = {
   grass:"#2f9e44", forest:"#1b5e20", water:"#1971c2", mountain:"#6c757d",
   sea:"#0b3d91", lake:"#4dabf7", bridge:"#8d6e63", desert:"#e9c46a",
   town:"#ff8fa3", school:"#ffd43b", home:"#ffc078", cave:"#495057",
+  snow:"#c8dce8", onsen:"#4dd0e1",
 };
 
 const MINI_R = 12; // プレイヤー周囲±12タイルを表示
@@ -2033,7 +2034,7 @@ function PrologueScreen({ playerName, onDone }) {
 }
 
 // ─── MAP SCREEN (スプライト + キーボード対応) ─────────────────────────────────
-function MapScreen({ player, onMove, onInvestigate, onInfo }) {
+function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
   const handleMovePointer = (dx, dy) => (e) => {
     e.preventDefault();
     onMove(dx, dy);
@@ -2048,15 +2049,9 @@ function MapScreen({ player, onMove, onInvestigate, onInfo }) {
   const startY = clamp(pos.y - half, 0, MAP_SIZE - VIEW_SIZE);
   const viewRows = MAP_GRID.slice(startY, startY + VIEW_SIZE).map(row => row.slice(startX, startX + VIEW_SIZE));
 
-  // 昼夜サイクル（80歩ごとに朝→昼→夕→夜）
-  const phase = Math.floor((player.animStep % 320) / 80);
-  const timeLabel  = ["朝", "昼", "夕方", "夜"][phase];
-  const nightOverlay = [
-    "rgba(255,200,100,0.10)",  // 朝: 暖かいオレンジ
-    "rgba(0,0,0,0)",            // 昼: オーバーレイなし
-    "rgba(220,80,30,0.15)",     // 夕方: 夕焼け赤橙
-    "rgba(0,15,70,0.42)",       // 夜: 深夜ブルー
-  ][phase];
+  // 昼夜サイクル（isNight = リアルタイム3分切り替え）
+  const timeLabel = isNight ? "夜" : "昼";
+  const nightOverlay = isNight ? "rgba(0,15,70,0.48)" : "rgba(0,0,0,0)";
 
   const tileName = {
     [TILE.GRASS]:"草原",[TILE.FOREST]:"森",[TILE.WATER]:"川",[TILE.MOUNTAIN]:"山岳",
@@ -2201,7 +2196,7 @@ function MapScreen({ player, onMove, onInvestigate, onInfo }) {
 }
 
 // ─── INTERIOR MAP SCREEN (NEW) ────────────────────────────────────────────────
-function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInfo, onBoss, onBuy, onFlag, onLearnSpell, onOpenTreasure }) {
+function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInfo, onBoss, onBuy, onFlag, onLearnSpell, onOpenTreasure, onGiveItem }) {
   const isCave = interiorType === "cave";
   const [currentFloor, setCurrentFloor] = useState(1);
   const map = isCave ? (CAVE_FLOORS[currentFloor] ?? CAVE_FLOORS[1]) : (INTERIOR_MAPS[interiorType] ?? TOWN_IMAP);
@@ -2210,8 +2205,10 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   const exitPos = findExitPos(map);
   const rows = map.length;
   const cols = map[0]?.length ?? 12;
-  const tileStyle = isCave ? CAVE_INT_STYLE : INT_STYLE;
+  const isUnderground = interiorType === "underground";
+  const tileStyle = isCave ? CAVE_INT_STYLE : isUnderground ? UNDERGROUND_INT_STYLE : INT_STYLE;
   const title = isCave ? `くらやみの洞窟 B${currentFloor}`
+    : isUnderground ? "地下フィールド ─ ガイア団基地"
     : interiorType === "village" ? "はじまりの村 (内部)"
     : interiorType === "town" ? "いずみの街 (内部)"
     : interiorType === "manabiVillage" ? "まなびの村 (内部)"
@@ -2294,6 +2291,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
       const ALL_FLAGS = ["hana", "neko", "kumo", "ninja"];
       const flags = player.nazoFlags ?? [];
       const hasAll = ALL_FLAGS.every((f) => flags.includes(f));
+      const hasAncientKey = (player.bag || []).some((i) => i.id === "ancient_key" && i.count > 0);
       if (hasAll && !player.nazoSpellLearned) {
         ev = { messages: [
           "仙人マン：「……ほほう！",
@@ -2301,14 +2299,18 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
           "では　授けよう——　せんにんのかぜ！",
           "この風は　あらゆる　敵を　薙ぎ払う。",
           "MP6が　必要じゃが……それだけの　価値はある。",
-          "使いこなせよ！",
-        ], learnSpell: true };
+          "そして……この　「ふるびたかぎ」も　持っていくがよい。",
+          "ドランゴの　すみかへの　扉を　開ける　鍵じゃ。",
+        ], learnSpell: true, giveItem: "ancient_key" };
       } else if (player.nazoSpellLearned) {
-        ev = { messages: [
+        ev = { messages: hasAncientKey ? [
           "仙人マン：「……すでに　魔法は　授けた。",
           "せんにんのかぜは　使いこなせておるか？",
           "強い風は　使い所が　肝心じゃ。",
-        ]};
+        ] : [
+          "仙人マン：「……ふるびたかぎを　まだ　持っていないのか。",
+          "ほれ、持っていきなさい。",
+        ], giveItem: hasAncientKey ? null : "ancient_key" };
       } else {
         const remaining = ALL_FLAGS.filter((f) => !flags.includes(f));
         const nameMap = { hana: "はなくん", neko: "猫くん", kumo: "雲まん", ninja: "忍者" };
@@ -2321,7 +2323,22 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     }
     if (interiorType === "catVillage" && ev.catTalk) {
       const hasKonnyaku = (player.bag || []).some((i) => i.id === "neko_konnyaku" && i.count > 0);
-      ev = { messages: hasKonnyaku ? ev.unlockedMessages : ev.lockedMessages };
+      const hasDragonScale = (player.bag || []).some((i) => i.id === "dragon_scale" && i.count > 0);
+      if (eventKey === "2,2" && hasKonnyaku && !hasDragonScale) {
+        ev = { messages: [
+          ...ev.unlockedMessages,
+          "ネコ長：「そうじゃ……お礼に　これを。",
+          "ドランゴの　うろこじゃ。　あやつを　倒した者が　落としていった。",
+          "「ドラゴンのウロコ」を　てにいれた！",
+        ], giveItem: "dragon_scale" };
+      } else if (eventKey === "2,2" && hasDragonScale) {
+        ev = { messages: [
+          "ネコ長：「ウロコは　もう　渡したにゃ。",
+          "ドランゴを　たのんだにゃ……！",
+        ]};
+      } else {
+        ev = { messages: hasKonnyaku ? ev.unlockedMessages : ev.lockedMessages };
+      }
     }
     return ev;
   }, [events, interiorType, player.nazoFlags, player.nazoSpellLearned, player.bag]);
@@ -2336,12 +2353,13 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     }
     if (ev.flag && onFlag) onFlag(ev.flag);
     if (ev.learnSpell && onLearnSpell) onLearnSpell();
+    if (ev.giveItem && onGiveItem) onGiveItem(ev.giveItem);
     setIntEvent(ev);
     return true;
   }, [resolveEventForNpc, onHeal, onBuff, usedBuffKeys, onFlag, onLearnSpell]);
 
   useEffect(() => {
-    const movableInteriors = ["village", "town", "manabiVillage", "nazoVillage", "catVillage"];
+    const movableInteriors = ["village", "town", "manabiVillage", "nazoVillage", "catVillage", "underground"];
     if (!movableInteriors.includes(interiorType)) return undefined;
     const timer = setInterval(() => {
       setNpcStates((prev) => {
@@ -2498,10 +2516,10 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
 
   const TS = Math.max(20, Math.floor(336 / cols));
   return (
-    <div className={`relative flex flex-col h-full ${isCave ? "bg-gray-950" : "bg-black"} text-white px-2 py-3 gap-2`}>
-      <div className={`border p-2 text-xs text-center ${isCave ? "border-gray-800 text-gray-400" : "border-gray-600 text-yellow-300"}`}>{title}</div>
+    <div className={`relative flex flex-col h-full ${isCave ? "bg-gray-950" : isUnderground ? "bg-stone-950" : "bg-black"} text-white px-2 py-3 gap-2`}>
+      <div className={`border p-2 text-xs text-center ${isCave ? "border-gray-800 text-gray-400" : isUnderground ? "border-stone-700 text-amber-600" : "border-gray-600 text-yellow-300"}`}>{title}</div>
       <div className="flex justify-center">
-        <div className="inline-grid gap-0" style={{ gridTemplateColumns: `repeat(${cols},${TS}px)`, border: `1px solid ${isCave ? "#222" : "#444"}` }}>
+        <div className="inline-grid gap-0" style={{ gridTemplateColumns: `repeat(${cols},${TS}px)`, border: `1px solid ${isCave ? "#222" : isUnderground ? "#1c1008" : "#444"}` }}>
           {map.map((row, y) => row.map((tile, x) => {
             const isPlayer = intPos.x === x && intPos.y === y;
             const npc = npcByPos[`${y},${x}`];
@@ -2643,6 +2661,12 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
   const doEnemyTurn = useCallback((curPHp) => {
+    // 逃走フラグ付き敵（メタにゃん等）：80%の確率で逃げ出す
+    if (enemy.flees && rng(1, 10) <= 8) {
+      addLog(`${enemy.name}は　すばやく　にげだした！`);
+      setTimeout(() => onFlee(), 900);
+      return curPHp;
+    }
     if (sleeping) { addLog(`${enemy.name}は　ねむっている…`); setSleeping(false); return curPHp; }
     const mgPool = enemyMagics;
     if (mgPool.length && rng(0, 2) === 0) {
@@ -2670,7 +2694,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     }
     setPHp(next);
     return next;
-  }, [enemy, player, sleeping, enemyMagics]);
+  }, [enemy, player, sleeping, enemyMagics, onFlee]);
 
   useEffect(() => {
     if (turnSerial <= 0 || !poisoned || poisonTurns <= 0) return;
@@ -2693,7 +2717,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       ? Math.max(2, Math.floor(player.atk * 1.8) + rng(2, 5))
       : Math.max(1, player.atk - (enemy.def ?? 0) + rng(-1, 2));
     const newHp = Math.max(0, enemy.curHp - dmg);
-    if (isCritical) addLog("かいしんの　いちげき！");
+    if (isCritical) addLog("たましいの　ひとうち！");
     addLog(`${player.name}の　こうげき！ ${enemy.name}に ${dmg}の　ダメージ！`);
     setEnemyFlash(true);
     setTimeout(() => setEnemyFlash(false), 90);
