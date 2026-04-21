@@ -2156,6 +2156,9 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
         <div className="mt-1 text-[10px] text-gray-400">
           {canInvestigate ? "A/Enterで　はいる" : "SELECTで　メニュー"}
         </div>
+        {(player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && (
+          <div className="mt-1 text-[10px] text-yellow-300">🐱 猫のともだちが　ついてきている　にゃ</div>
+        )}
       </div>
 
       {/* コントロール */}
@@ -2214,6 +2217,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     : interiorType === "manabiVillage" ? "まなびの村 (内部)"
     : interiorType === "nazoVillage" ? "謎の村 (内部)"
     : interiorType === "catVillage" ? "猫の村 (内部)"
+    : interiorType === "southShrine" ? "南の祠"
     : "まなびの学校 (内部)";
 
   const [intPos, setIntPos] = useState({ x: exitPos.x, y: Math.max(0, exitPos.y - 1) });
@@ -2340,6 +2344,38 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
         ev = { messages: hasKonnyaku ? ev.unlockedMessages : ev.lockedMessages };
       }
     }
+    if (interiorType === "school" && eventKey === "8,8") {
+      const hasQuest  = (player.storyFlags || []).includes("story:royalQuest");
+      const hasJoined = (player.storyFlags || []).includes("story:kousuke_join");
+      if (hasQuest && !hasJoined) {
+        ev = { messages: [
+          "コウスケ（がり勉）：「……王様の使命を　受けたんだろ。",
+          "……弱点は、おそれのない心、らしい。",
+          "俺は　行けないけど……",
+          "俺の分まで　頑張ってくれ。",
+          "洞窟でピンチになったら　俺のことを思い出してくれ。",
+          "コウスケが　こころで　ともに　戦う！",
+        ], flag: "story:kousuke_join", shop: true, shopItems: "T2" };
+      }
+    }
+    if (interiorType === "southShrine" && eventKey === "5,5") {
+      const hasRecorder = (player.bag || []).some(i => i.id === "recorder" && i.count > 0);
+      if (!hasRecorder) {
+        ev = { messages: [
+          "占い婆さん：「……来たか。予言しておったぞ。",
+          "旅人よ、この道聞きリコーダーを持っていきなさい。",
+          "ふけば……まだ手に入れていないものの方角が、",
+          "かすかに　聞こえてくるはずじゃ。",
+          "「道聞きリコーダー」を　てにいれた！",
+        ], giveItem: "recorder" };
+      } else {
+        ev = { messages: [
+          "占い婆さん：「リコーダーは　もう　持っておるじゃろう。",
+          "ふけば……まだ集めていないものの方角が　分かるはずじゃ。",
+          "じょうほう画面を開いて　使ってみるがよい。",
+        ]};
+      }
+    }
     return ev;
   }, [events, interiorType, player.nazoFlags, player.nazoSpellLearned, player.bag]);
 
@@ -2359,7 +2395,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   }, [resolveEventForNpc, onHeal, onBuff, usedBuffKeys, onFlag, onLearnSpell]);
 
   useEffect(() => {
-    const movableInteriors = ["village", "town", "manabiVillage", "nazoVillage", "catVillage", "underground"];
+    const movableInteriors = ["village", "town", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"];
     if (!movableInteriors.includes(interiorType)) return undefined;
     const timer = setInterval(() => {
       setNpcStates((prev) => {
@@ -2645,20 +2681,41 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     if (!m) return [];
     return Array.isArray(m) ? m : [m];
   }, [initEnemy]);
-  const [pHp, setPHp]       = useState(player.hp);
-  const [pMp, setPMp]       = useState(player.mp);
-  const [log, setLog]       = useState([`${initEnemy.name}が　あらわれた！`]);
-  const [phase, setPhase]   = useState("command");
+  const [pHp, setPHp]           = useState(player.hp);
+  const [pMp, setPMp]           = useState(player.mp);
+  const [log, setLog]           = useState([`${initEnemy.name}が　あらわれた！`]);
+  const [phase, setPhase]       = useState("command");
   const [sleeping, setSleeping] = useState(false);
   const [enemyFlash, setEnemyFlash] = useState(false);
   const [poisoned, setPoisoned] = useState(false);
   const [poisonTurns, setPoisonTurns] = useState(0);
+  const [fearDebuffTurns, setFearDebuffTurns] = useState(0);
   const [turnSerial, setTurnSerial] = useState(0);
   const [busy, setBusy] = useState(false);
   const logRef = useRef(null);
+  const prevFearRef = useRef(0);
+
+  // おそれレベル：HP比率から自動計算
+  const fearLevel = useMemo(() => {
+    if (pHp <= player.maxHp * 0.25) return 2;
+    if (pHp <= player.maxHp * 0.5)  return 1;
+    return 0;
+  }, [pHp, player.maxHp]);
+
+  // コウスケ同行フラグ（ボス戦除く）
+  const hasCompanion = !isBoss && (player.storyFlags || []).includes("story:kousuke_join");
 
   const addLog = (msg) => setLog(prev => [...prev.slice(-11), msg]);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
+
+  // おそれレベルが上がったときにログ表示
+  useEffect(() => {
+    if (fearLevel > prevFearRef.current) {
+      if (fearLevel === 2) addLog(`${player.name}は　きょうふに　とりつかれた！ こうげき-4！`);
+      else if (fearLevel === 1) addLog(`${player.name}は　おそれを　感じている…… こうげき-2！`);
+    }
+    prevFearRef.current = fearLevel;
+  }, [fearLevel, player.name]);
 
   const doEnemyTurn = useCallback((curPHp) => {
     // 逃走フラグ付き敵（メタにゃん等）：80%の確率で逃げ出す
@@ -2674,6 +2731,11 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       if (mg.type === "heal") {
         setEnemy(e => ({ ...e, curHp: Math.min(e.hp, e.curHp + mg.power) }));
         addLog(`${enemy.name}は　${mg.name}を　となえた！　HPが　かいふく！`);
+        return curPHp;
+      } else if (mg.type === "fear") {
+        setFearDebuffTurns(3);
+        addLog(`${enemy.name}は　${mg.name}を　となえた！`);
+        addLog(`${player.name}の　こころに　やみが　宿る……（こうげき-3、3ターン）`);
         return curPHp;
       } else {
         const dmg  = Math.max(1, mg.power - Math.floor(player.def / 3) + rng(-1, 2));
@@ -2713,16 +2775,29 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     if (busy) return;
     setBusy(true);
     const isCritical = rng(1, 100) <= 3;
+    // おそれペナルティ
+    const fearPenalty = fearLevel === 2 ? 4 : fearLevel === 1 ? 2 : 0;
+    const darkPenalty = fearDebuffTurns > 0 ? 3 : 0;
+    const effectiveAtk = Math.max(1, player.atk - fearPenalty - darkPenalty);
     const dmg = isCritical
-      ? Math.max(2, Math.floor(player.atk * 1.8) + rng(2, 5))
-      : Math.max(1, player.atk - (enemy.def ?? 0) + rng(-1, 2));
-    const newHp = Math.max(0, enemy.curHp - dmg);
+      ? Math.max(2, Math.floor(effectiveAtk * 1.8) + rng(2, 5))
+      : Math.max(1, effectiveAtk - (enemy.def ?? 0) + rng(-1, 2));
+    let curEHp = Math.max(0, enemy.curHp - dmg);
     if (isCritical) addLog("たましいの　ひとうち！");
     addLog(`${player.name}の　こうげき！ ${enemy.name}に ${dmg}の　ダメージ！`);
     setEnemyFlash(true);
     setTimeout(() => setEnemyFlash(false), 90);
-    setEnemy(e => ({ ...e, curHp: newHp }));
-    if (newHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 320);
+    setEnemy(e => ({ ...e, curHp: curEHp }));
+    if (fearDebuffTurns > 0) setFearDebuffTurns(t => t - 1);
+    if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 320);
+    // コウスケ援護（20%）
+    if (hasCompanion && rng(1, 5) === 1) {
+      const compDmg = rng(5, 10);
+      curEHp = Math.max(0, curEHp - compDmg);
+      addLog(`コウスケの　こころが　助けに来た！ ${compDmg}の　ダメージ！`);
+      setEnemy(e => ({ ...e, curHp: curEHp }));
+      if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 320);
+    }
     setTimeout(() => {
       const n = doEnemyTurn(pHp);
       setTurnSerial((t) => t + 1);
@@ -2813,6 +2888,10 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
         <HPBar label="HP" current={pHp} max={player.maxHp} />
         <HPBar label="MP" current={pMp} max={player.maxMp} color="blue" />
         {poisoned && <p className="text-[10px] text-purple-300">状態：どく ({poisonTurns})</p>}
+        {fearLevel === 2 && <p className="text-[10px] text-red-400">状態：きょうふ（こうげき-4）</p>}
+        {fearLevel === 1 && <p className="text-[10px] text-orange-300">状態：おびえ（こうげき-2）</p>}
+        {fearDebuffTurns > 0 && <p className="text-[10px] text-red-300">やみのことば（こうげき-3、残{fearDebuffTurns}T）</p>}
+        {hasCompanion && <p className="text-[10px] text-cyan-300">コウスケが　ともに　戦っている</p>}
       </div>
 
       {/* 最新ログ黄色 / 敵行動を赤（Safari互換） */}
@@ -2916,7 +2995,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
   );
 }
 
-function InfoOverlay({ player, onClose, onSave, onWarp }) {
+function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
   const equip = player.equip ?? {};
   const eqName = (id) => id ? (EQUIP_DICT[id]?.name ?? id) : "なし";
   const WARP_POINTS = [
@@ -2944,10 +3023,24 @@ function InfoOverlay({ player, onClose, onSave, onWarp }) {
           <p>アクセ：{eqName(equip.accessory)}</p>
         </div>
         {player.bag && player.bag.length > 0 && (
-          <p className="border-t border-gray-700 pt-2">どうぐ：{player.bag.map(i => `${i.name}×${i.count}`).join(" / ")}</p>
+          <div className="border-t border-gray-700 pt-2">
+            <p>どうぐ：{player.bag.map(i => `${i.name}×${i.count}`).join(" / ")}</p>
+            {player.bag.some(i => i.id === "recorder" && i.count > 0) && (
+              <button
+                className="mt-2 w-full border border-purple-500 text-purple-300 text-xs py-1 active:opacity-60"
+                onClick={() => onUseRecorder && onUseRecorder(player.pos)}
+              >♪ リコーダーをふく</button>
+            )}
+          </div>
         )}
         {player.nazoSpellLearned && (
           <p className="text-blue-300 border-t border-gray-700 pt-2">せんにんのかぜ　習得済み</p>
+        )}
+        {(player.storyFlags || []).includes("story:kousuke_join") && (
+          <p className="text-cyan-300 border-t border-gray-700 pt-2">仲間：コウスケが　こころで　ともに　戦う</p>
+        )}
+        {(player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && (
+          <p className="text-yellow-300 border-t border-gray-700 pt-2">仲間：猫のともだち（にゃ）</p>
         )}
         <div className="border-t border-gray-700 mt-2 pt-2 space-y-1">
           <p className="text-yellow-400">── しめい ──</p>

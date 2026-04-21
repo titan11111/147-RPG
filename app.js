@@ -250,7 +250,7 @@ function App() {
       return;
     }
     if (screen === SCREEN.INTERIOR) {
-      if (["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground"].includes(interiorType || "")) {
+      if (["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || "")) {
         startBgm("town");
         return;
       }
@@ -278,7 +278,7 @@ function App() {
       }
       const scene = screen === SCREEN.BATTLE
         ? (isBoss ? "boss" : "battle")
-        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground"].includes(interiorType || ""))
+        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || ""))
           ? "town"
           : (screen === SCREEN.INTERIOR && interiorType === "cave")
             ? null
@@ -397,6 +397,7 @@ function App() {
     }
     if (hasOwn(ev, "heal"))     setPlayer(p => ({ ...p, hp: p.maxHp, mp: p.maxMp }));
     if (hasOwn(ev, "buff"))     setPlayer(p => ({ ...p, atk: p.atk + ev.buff.val }));
+    if (hasOwn(ev, "save"))     saveGame();
     if (hasOwn(ev, "interior")) { setInteriorType(ev.interior); setScreen(SCREEN.INTERIOR); return; }
     if (hasOwn(ev, "boss"))     { setCurrentEnemy(BOSS_ENEMY); setIsBoss(true); setScreen(SCREEN.BATTLE); return; }
     setScreen(SCREEN.MAP);
@@ -588,7 +589,25 @@ function App() {
         {screen === SCREEN.GAMEOVER && <GameOverScreen onRetry={hasSave ? continueGame : () => { setPlayer(null); setScreen(SCREEN.TITLE); }} />}
         {screen === SCREEN.ENDING   && player && <EndingScreen player={player} />}
 
-        {showInfo && player && <InfoOverlay player={player} onClose={() => setShowInfo(false)} onSave={saveGame} onWarp={handleWarp} />}
+        {showInfo && player && <InfoOverlay player={player} onClose={() => setShowInfo(false)} onSave={saveGame} onWarp={handleWarp}
+          onUseRecorder={(pos) => {
+            const KEY_ITEMS = ["manabi_proof", "ancient_key", "dragon_scale"];
+            const bag = player.bag || [];
+            const missing = KEY_ITEMS.filter(id => !bag.some(i => i.id === id && i.count > 0));
+            const hasCat = bag.some(i => i.id === "dragon_scale" && i.count > 0);
+            let msgs;
+            if (missing.length === 0) {
+              msgs = ["リコーダーをふいた……", "♪ ……", "音は何も導かない。", "必要なものは　すべて　集まっている。"];
+              if (hasCat) msgs.push("……猫のともだちが　うれしそうに　鳴いた。　にゃ！");
+            } else {
+              msgs = ["リコーダーをふいた……", "♪ ……"];
+              missing.forEach(itemId => msgs.push(getRecorderHint(pos, itemId)));
+              if (hasCat) msgs.push("……猫のともだちが　一緒に　耳を澄ませている。");
+            }
+            setShowInfo(false);
+            setPendingMsg(msgs);
+          }}
+        />
         {showPending && pendingMsg && (
           <div className="absolute inset-0 flex items-end justify-center bg-black/80 p-4 z-40">
             <MessageBox lines={pendingMsg} onNext={() => { setShowPending(false); setPendingMsg(null); }} />

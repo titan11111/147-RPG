@@ -108,6 +108,7 @@ const SPECIAL_POS = {
   nazoVillage:  { x:  5, y: 45 },   // dist=40 謎の村（仙人マンたちの村）
   catVillage:   { x: 46, y:  6 },   // dist=40 猫の村
   onsen:        { x: 40, y: 36 },   // dist=30 雪原の露天温泉（地下への入口）
+  southShrine:  { x: 24, y: 40 },   // 南の祠（占い婆さん・道聞きリコーダー）
 };
 
 const WORLD_MARKERS = {
@@ -121,6 +122,7 @@ const WORLD_MARKERS = {
   [`${SPECIAL_POS.nazoVillage.y},${SPECIAL_POS.nazoVillage.x}`]: "mysticVillage",
   [`${SPECIAL_POS.catVillage.y},${SPECIAL_POS.catVillage.x}`]: "catVillage",
   [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: "onsen",
+  [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: "village",
 };
 
 function getWorldLandmarkType(tile, x, y) {
@@ -235,6 +237,7 @@ const ITEMS = {
   manabi_proof:  { name:"まなびのあかし",   heal:0, keyItem:true },
   ancient_key:   { name:"ふるびたかぎ",     heal:0, keyItem:true },
   dragon_scale:  { name:"ドラゴンのウロコ", heal:0, keyItem:true },
+  recorder:      { name:"道聞きリコーダー", heal:0, keyItem:true, usable:true },
 };
 
 // ─── NPC PALETTE ──────────────────────────────────────────────────────────────
@@ -281,6 +284,9 @@ const NPC_PALETTE = {
     "5,2":  { body:"#94a3b8", hair:"#1e293b" }, // 猫くん（グレー）
     "5,8":  { body:"#bae6fd", hair:"#e0f2fe" }, // 雲まん（空色）
     "8,5":  { body:"#1e293b", hair:"#475569" }, // 忍者（黒）
+  },
+  southShrine: {
+    "5,5": { body:"#7c3aed", hair:"#fde68a" }, // 占い婆さん（紫・金）
   },
   catVillage: {
     "2,2": { body:"#f9a8d4", hair:"#7c2d12" },
@@ -349,6 +355,9 @@ function generateMapGrid() {
   grid[SPECIAL_POS.manabiVillage.y][SPECIAL_POS.manabiVillage.x] = TILE.TOWN;
   grid[SPECIAL_POS.nazoVillage.y][SPECIAL_POS.nazoVillage.x]    = TILE.TOWN;
   grid[SPECIAL_POS.catVillage.y][SPECIAL_POS.catVillage.x]      = TILE.TOWN;
+  grid[SPECIAL_POS.southShrine.y][SPECIAL_POS.southShrine.x]   = TILE.TOWN;
+  // セーブポイント（雪ゾーン外に固定）
+  [[27,23],[18,22],[25,29]].forEach(([y,x]) => { grid[y][x] = TILE.GRASS; });
 
   // ─ 雪原生成（洞窟周辺をSNOWタイルで覆う）────────────────────────────────
   const FIXED_TILES = new Set([TILE.SEA, TILE.LAKE, TILE.WATER, TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE]);
@@ -422,6 +431,7 @@ const SIGN_MAP = (() => {
     { pos: SPECIAL_POS.nazoVillage,   name: '謎の村' },
     { pos: SPECIAL_POS.catVillage,    name: '猫の村' },
     { pos: SPECIAL_POS.onsen,         name: '雪原の温泉' },
+    { pos: SPECIAL_POS.southShrine,   name: '南の祠' },
   ];
   // 近すぎる案内を避けるため、まず遠距離(6〜8マス)を優先して配置する。
   // 迷ったときに見つける「道しるべ」として機能させる。
@@ -646,11 +656,27 @@ const CAT_VILLAGE_IMAP = parseIntMap([
   "WWWWWWWWWWWW",
 ]);
 
+// ─── 南の祠マップ ───────────────────────────────────────────────────────────────
+const SOUTH_SHRINE_IMAP = parseIntMap([
+  "WWWWWWWWWWWW",  // row 0
+  "W..........W",  // row 1
+  "W....B.....W",  // row 2: [2,5]=石碑
+  "W....F.....W",  // row 3: [3,5]=御神水の泉
+  "W..........W",  // row 4
+  "W....N.....W",  // row 5: [5,5]=占い婆さん
+  "W..........W",  // row 6
+  "W..........W",  // row 7
+  "W..........W",  // row 8
+  "W....E.....W",  // row 9: 出口
+  "WWWWWWWWWWWW",  // row 10
+]);
+
 const INTERIOR_MAPS = {
   village: VILLAGE_IMAP, town: TOWN_IMAP, school: SCHOOL_IMAP,
   castle: CASTLE_IMAP,
   cave: CAVE_IMAP, manabiVillage: MANABI_VILLAGE_IMAP, nazoVillage: NAZO_VILLAGE_IMAP,
   catVillage: CAT_VILLAGE_IMAP, underground: UNDERGROUND_IMAP,
+  southShrine: SOUTH_SHRINE_IMAP,
 };
 
 const CAVE_EVENTS_BY_FLOOR = {
@@ -679,9 +705,16 @@ const CAVE_EVENTS_BY_FLOOR = {
   3: {
     "1,5": { messages: [
       "……。",
+      "…………。",
       "……よく　ここまで　来た。",
-      "ずっと　待っていた。",
-      "では　見せてやろう……闇の力を。",
+      "おまえが　希望を　持ち込もうとしていることは……",
+      "ずっと　見えていた。",
+      "だが——",
+      "希望は　おそれの　裏側に　ある。",
+      "そのことを……　おまえは　知っているか？",
+      "……知っているのなら。",
+      "この　闇を　抜けてみせろ。",
+      "ドランゴが　ゆっくりと　振り返った……！",
     ], boss: true },
     "6,8": { messages: [
       "古い　石碑が　ある。",
@@ -817,9 +850,16 @@ const INTERIOR_EVENTS = {
     // 最奥の謎の存在（ボス戦トリガー）
     "1,5": { messages: [
       "……。",
+      "…………。",
       "……よく　ここまで　来た。",
-      "ずっと　待っていた。",
-      "では　見せてやろう……闇の力を。",
+      "おまえが　希望を　持ち込もうとしていることは……",
+      "ずっと　見えていた。",
+      "だが——",
+      "希望は　おそれの　裏側に　ある。",
+      "そのことを……　おまえは　知っているか？",
+      "……知っているのなら。",
+      "この　闇を　抜けてみせろ。",
+      "ドランゴが　ゆっくりと　振り返った……！",
     ], boss: true },
     // 古い石碑（隣接して調べる）
     "6,8": { messages: [
@@ -1089,11 +1129,32 @@ const INTERIOR_EVENTS = {
       "勇者よ……と呼ぶには　まだ早い。",
       "だが、そなたの歩みは　確かだ。",
       "まずは　まなびの学校へ向かい、",
-      "『おそれをこえる言葉』を　受け取るのだ。",
-      "そして　洞窟へ行け。",
+      "「おそれをこえる言葉」を　受け取るのだ。",
+      "洞窟の扉を開くには　3つのあかしが　必要だ。",
+      "まなびのあかし、ふるびたかぎ、ドラゴンのウロコ……",
+      "この3つを　集めなければ　先へは進めぬ。",
+      "……まずは　南の祠を　尋ねよ。",
       "姫と民を　救ってくれ。」",
       "『王の使命』を　受けた！",
     ], flag: "story:royalQuest", fixedNpc: true },
+  },
+  // ─── 南の祠 ──────────────────────────────────────────────────────────────────
+  southShrine: {
+    "2,5": { messages: [
+      "石碑に　文字が　刻まれている。",
+      "『道に迷いしものよ……",
+      "音に耳を澄ませば、",
+      "道は　おのずと　開ける』",
+    ]},
+    "3,5": { messages: [
+      "御神水が　静かに　湧き出ている。",
+      "一口　飲んでみた。",
+      "不思議と　心が　澄んでいく。",
+      "HPが　10　回復した！",
+    ], heal: 10 },
+    "5,5": { messages: [
+      "占い婆さん：「……来たか。予言しておったぞ。",
+    ]},
   },
 };
 
@@ -1233,6 +1294,32 @@ const LOCATION_EVENTS = {
     ],
     interior: "catVillage",
   },
+  // ─── セーブポイント碑（3か所）────────────────────────────────────────────────
+  "27,23": { name:"村の南の碑", messages:[
+    "旅人の足跡が刻まれた　古い石碑。",
+    "王の紋章が　静かに　輝いている……",
+    "ここまでの旅が　刻まれた！",
+  ], save: true },
+  "18,22": { name:"王城の碑", messages:[
+    "王城の近くに立つ　守護の碑。",
+    "剣と盾の紋章が　刻まれている。",
+    "ここまでの旅が　刻まれた！",
+  ], save: true },
+  "25,29": { name:"まよい道の碑", messages:[
+    "旅の分かれ道に立つ　道標の碑。",
+    "「道に迷ったとき　足跡を振り返れ」と　刻まれている。",
+    "ここまでの旅が　刻まれた！",
+  ], save: true },
+  [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: {
+    name: "南の祠",
+    messages: [
+      "南の橋のほとりに　ひっそりと　建つ　小さな祠。",
+      "古びた石造りの　扉が　開いている。",
+      "中から　お香の匂いが　漂ってくる……",
+      "祠の中へ　はいる……",
+    ],
+    interior: "southShrine",
+  },
   [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: {
     name: "雪原の露天温泉",
     messages: [
@@ -1297,11 +1384,12 @@ const ENEMIES = [
   { id:37,  name:"あんこくまじゅつし",hp:55, atk:22, def: 8, exp:45, gold:28, magic:{ name:"じごくのほのお",type:"dmg", power:18 }, drop:{ id:"potion", rate:0.25 } },
   // ─ ボス (洞窟のみ) ─
   { id:38,  name:"ドランゴ",       hp:200, atk:24, def:10, exp:75, gold:50, magic:[
-    { name:"やみのいかずち", type:"dmg", power:17 },
-    { name:"闇の吐息",     type:"dmg", power:20 },
+    { name:"やみのいかずち", type:"dmg",  power:17 },
+    { name:"闇の吐息",     type:"dmg",  power:20 },
+    { name:"やみのことば", type:"fear" },
   ] },
   // ─ 猫の森のレア枠 ─
-  { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:0.14 } },
+  { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:0.5 } },
   // ─ レアエンカウント ─
   { id:40,  name:"メタにゃん",     hp:3,  atk:5,  def:99, exp:120, gold:1, flees:true },
 ];
@@ -1309,6 +1397,29 @@ const ENEMIES = [
 const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
 const E = (id) => ENEMY_BY_ID[id];
 const BOSS_ENEMY = E(38);
+
+// ─── RECORDER HINT SYSTEM ─────────────────────────────────────────────────────
+const KEY_ITEM_LOCATIONS = {
+  manabi_proof: SPECIAL_POS.manabiVillage,
+  ancient_key:  SPECIAL_POS.nazoVillage,
+  dragon_scale: SPECIAL_POS.catVillage,
+};
+
+function getRecorderHint(playerPos, itemId) {
+  const target = KEY_ITEM_LOCATIONS[itemId];
+  if (!target) return "……かすかな音が　聞こえた気がした。";
+  const dx = target.x - playerPos.x;
+  const dy = target.y - playerPos.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  let dir;
+  if (adx > ady * 1.8)       dir = dx > 0 ? "右" : "左";
+  else if (ady > adx * 1.8)  dir = dy > 0 ? "下（南）" : "上（北）";
+  else if (dx > 0 && dy < 0) dir = "右斜め上";
+  else if (dx > 0 && dy > 0) dir = "右斜め下";
+  else if (dx < 0 && dy < 0) dir = "左斜め上";
+  else                        dir = "左斜め下";
+  return `……${dir}の方から　聞こえた気がした。`;
+}
 /** 戦闘用。PNG 未配置の id はベクター（`images/enemy-{id}.png` で上書き）。参照用: id→名前 */
 const ENEMY_VECTOR_FALLBACK_NAMES = Object.fromEntries(ENEMIES.map((e) => [e.id, e.name]));
 
