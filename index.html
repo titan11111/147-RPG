@@ -5,14 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>146-RPG</title>
+  <title>147-RPG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    (function () {
+      function showFatal(msg) {
+        var el = document.getElementById("fatal-error");
+        if (!el) {
+          el = document.createElement("pre");
+          el.id = "fatal-error";
+          el.style.position = "fixed";
+          el.style.left = "8px";
+          el.style.right = "8px";
+          el.style.bottom = "8px";
+          el.style.zIndex = "99999";
+          el.style.background = "rgba(120,0,0,0.9)";
+          el.style.color = "#fff";
+          el.style.padding = "8px";
+          el.style.fontSize = "12px";
+          el.style.whiteSpace = "pre-wrap";
+          document.addEventListener("DOMContentLoaded", function () {
+            document.body.appendChild(el);
+          });
+        }
+        el.textContent = "Runtime error:\n" + String(msg || "unknown");
+      }
+      window.addEventListener("error", function (e) { showFatal(e.message); });
+      window.addEventListener("unhandledrejection", function (e) { showFatal((e.reason && e.reason.message) || e.reason); });
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>

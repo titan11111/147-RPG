@@ -607,7 +607,7 @@ function App() {
             setShowInfo(false);
             setPendingMsg(msgs);
           }}
-        />
+        />}
         {showPending && pendingMsg && (
           <div className="absolute inset-0 flex items-end justify-center bg-black/80 p-4 z-40">
             <MessageBox lines={pendingMsg} onNext={() => { setShowPending(false); setPendingMsg(null); }} />

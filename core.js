@@ -151,7 +151,7 @@ function getEncounterCounter() {
 async function bootstrapRuntimeAssets() {
   const supportsImageBitmap = typeof createImageBitmap === "function";
   const requests = [
-    fetch("./game-data.json", { cache: "no-cache" }),
+    fetch("./game-data.json"),
     supportsImageBitmap
       ? fetch("data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' fill='%23111'/><circle cx='16' cy='16' r='10' fill='%23ffd43b'/><circle cx='13' cy='14' r='2' fill='%23111'/><circle cx='19' cy='14' r='2' fill='%23111'/><rect x='10' y='20' width='12' height='2' fill='%23111'/></svg>"))
       : Promise.resolve(null),
@@ -269,6 +269,9 @@ const NPC_PALETTE = {
   cave: {
     "9,2": { body:"#7f1d1d", hair:"#1a0a00" }, // ぼろぼろの冒険者
     "1,5": { body:"#1a0a2a", hair:"#0a0015" }, // 謎の存在（ボス）
+  },
+  castle: {
+    "8,8": { body:"#6b7280", hair:"#1f2937" }, // 衛兵（グレー）
   },
   manabiVillage: {
     "2,2":  { body:"#c084fc", hair:"#581c87" }, // 国語先生（紫・文学）
@@ -518,7 +521,7 @@ const CASTLE_IMAP = parseIntMap([
   "W..C............C..W",
   "W..C....TTTT....C..W", // 宝箱（将来拡張用）
   "W..C............C..W",
-  "W..CCCC..CC..CCCC..W",
+  "W..CCCC.NC..CCCC...W",
   "W.......N..........W", // 姫
   "W..................W",
   "W.....N............W", // 王
@@ -765,12 +768,12 @@ const INTERIOR_EVENTS = {
       "……でも　まだ　こわくて。",
       "きみを　見てたら　少し　勇気が　出てきた！",
       "HPが　3　回復した！",
-    ], heal: 3 },
+    ], heal: 3, mood: "hope" },
     "10,10": { messages: [
       "みちびきの　おじいさん：「戻ってきたか。",
       "街道は　まだ危ない。焦らず　育っていけ。",
       "次は　東のいずみの街で　情報を集めるといいぞ。",
-    ]},
+    ], mood: "warn" },
   },
   town: {
     // 武器屋 ゴラン（無口で無骨、でも本質を突く）
@@ -797,7 +800,7 @@ const INTERIOR_EVENTS = {
       "私の言葉も　届かなくなった。",
       "……だが　勇者よ。おまえの　足音には　詩がある。",
       "行け。私には　もう　行けないが。",
-    ]},
+    ], mood: "sad" },
     // ミズキ（太宰治スタイル：自己否定、でも深い優しさ）
     "5,13": { messages: [
       "ミズキ：「……。",
@@ -806,7 +809,7 @@ const INTERIOR_EVENTS = {
       "……でも。",
       "あなたみたいな人が　いてくれるなら。",
       "少しだけ　この世界も　悪くないかと　思えてくる。",
-    ]},
+    ], mood: "sad" },
     // ネコ（謎めいた猫、核心を突く）
     "9,4": { messages: [
       "ネコ：「にゃ。",
@@ -814,7 +817,7 @@ const INTERIOR_EVENTS = {
       "ドランゴは　おそれを　食って　大きくなる。",
       "おそれなければ　小さくなるにゃ。",
       "……にゃ。",
-    ]},
+    ], mood: "warn" },
     // ヒロシ（ガサツだが義侠心がある）
     "9,11": { messages: [
       "ヒロシ（がっちり男）：「おう！　旅人か！",
@@ -823,7 +826,7 @@ const INTERIOR_EVENTS = {
       "でもよ、マジで　頼むわ。",
       "俺の娘が　ドランゴのせいで　笑わなくなったんだ。",
       "……頼むな。本当に。",
-    ]},
+    ], mood: "sad" },
     // イヌ（犬らしい全力さ、シンプルな応援）
     "13,3": { messages: [
       "イヌ：「わんわん！",
@@ -860,20 +863,20 @@ const INTERIOR_EVENTS = {
       "……知っているのなら。",
       "この　闇を　抜けてみせろ。",
       "ドランゴが　ゆっくりと　振り返った……！",
-    ], boss: true },
+    ], boss: true, mood: "warn" },
     // 古い石碑（隣接して調べる）
     "6,8": { messages: [
       "古い　石碑が　ある。",
       "『ちからは　おそれを　こえた　さきに　ある』",
       "……だれが　刻んだのか　わからない。",
-    ]},
+    ], mood: "hope" },
     // 地下の泉（上に立って調べる）
     "6,5": { messages: [
       "地の底から　湧き出る　冷たい泉。",
       "飲んでみた。",
       "なぜか　気持ちが　落ち着いた。",
       "HPが　5　回復した！",
-    ], heal: 5 },
+    ], heal: 5, mood: "hope" },
     // 道に迷った冒険者
     "9,2": { messages: [
       "ぼろぼろの　冒険者：「……き、きみか。",
@@ -881,7 +884,7 @@ const INTERIOR_EVENTS = {
       "奥に進むほど……気が遠くなる。",
       "……俺の装備、持ってけ。俺には　もう　必要ない。",
       "代わりに……　倒してきてくれ。頼む。",
-    ], shop: true, shopItems: "T3" },
+    ], shop: true, shopItems: "T3", mood: "sad" },
   },
   // ─── まなびの村（世界の端、小学5年向け教科NPC）────────────────────────────
   manabiVillage: {
@@ -1107,6 +1110,19 @@ const INTERIOR_EVENTS = {
   },
   // ─── 王城（城の王・姫・兵士）───────────────────────────────────────────────
   castle: {
+    "8,8": {
+      guard: true,
+      mood: "warn",
+      blockMessages: [
+        "「止まれ！　王の謁見なき者は　この先へ進めぬ！」",
+        "「まず王にお会いになりますよう。」",
+      ],
+      passMessages: [
+        "「……紋章を確認した。通れ。」",
+      ],
+      passCondition: (player) => (player.storyFlags || []).includes("story:royalQuest"),
+      fixedNpc: true,
+    },
     "2,6": { messages: [
       "兵士：「王様は　奥の間に　いらっしゃる。",
       "旅人よ、ここは　王城だ。",
@@ -1117,25 +1133,15 @@ const INTERIOR_EVENTS = {
       "……この国は　闇に　おびえている。」",
     ], fixedNpc: true },
     "9,8": { messages: [
-      "姫：「旅人さん……。",
-      "あなたの目は　逃げない人の目。",
-      "……どうか　王様のお話を　聞いて。」",
-      "心が　すこし　強くなった気がした。",
-      "HPが　3　回復した！",
+      "姫：「……勇者よ。」",
+      "「父である王が　あなたに　使命を　伝えたいと言っています。」",
+      "「王の間へ　お進みください。」",
     ], heal: 3, fixedNpc: true },
     "11,6": { messages: [
-      "王：「よく来た、旅人よ。",
-      "ドランゴが　この世界を　闇で　覆っている。",
-      "勇者よ……と呼ぶには　まだ早い。",
-      "だが、そなたの歩みは　確かだ。",
-      "まずは　まなびの学校へ向かい、",
-      "「おそれをこえる言葉」を　受け取るのだ。",
-      "洞窟の扉を開くには　3つのあかしが　必要だ。",
-      "まなびのあかし、ふるびたかぎ、ドラゴンのウロコ……",
-      "この3つを　集めなければ　先へは進めぬ。",
-      "……まずは　南の祠を　尋ねよ。",
-      "姫と民を　救ってくれ。」",
-      "『王の使命』を　受けた！",
+      "王：「よく来た　勇者よ。」",
+      "「ドランゴが　封印の洞窟に　潜んでいる。」",
+      "「この国の　未来を　頼む。」",
+      "王から　使命を　授かった！",
     ], flag: "story:royalQuest", fixedNpc: true },
   },
   // ─── 南の祠 ──────────────────────────────────────────────────────────────────

@@ -1258,13 +1258,67 @@ function ShopOverlay({ player, onBuy, onClose, items = SHOP_ITEMS_T1 }) {
 }
 
 // ─── MESSAGE BOX ─────────────────────────────────────────────────────────────
-function MessageBox({ lines, onNext, showCursor = true }) {
+// ─── CAVE DARKNESS OVERLAY ───────────────────────────────────────────────────
+function CaveDarkness({ intPos, TS, cols, rows }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = cols * TS;
+    const h = rows * TS;
+
+    // 画面全体を暗くする
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "rgba(0,0,0,0.90)";
+    ctx.fillRect(0, 0, w, h);
+
+    // プレイヤーの位置だけ消しゴム（ラジアルグラデーション）で光らせる
+    const px = intPos.x * TS + TS / 2;
+    const py = intPos.y * TS + TS / 2;
+    const radius = TS * 2.8;
+
+    const g = ctx.createRadialGradient(px, py, 0, px, py, radius);
+    g.addColorStop(0,   "rgba(0,0,0,1)");    // 中心：完全に消す（透過）
+    g.addColorStop(0.55,"rgba(0,0,0,0.85)"); // 少し外：ほぼ消す
+    g.addColorStop(1,   "rgba(0,0,0,0)");    // 端：消さない（暗い）
+
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = "source-over";
+  }, [intPos.x, intPos.y, TS, cols, rows]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={cols * TS}
+      height={rows * TS}
+      style={{
+        position: "absolute", top: 0, left: 0,
+        pointerEvents: "none", imageRendering: "pixelated",
+      }}
+    />
+  );
+}
+
+// mood → ウィンドウ演出マップ
+const MOOD_STYLE = {
+  warn:   { border: "#ef4444", bg: "#1a0000", text: "#fca5a5", speed: 28 }, // 赤・警告
+  sad:    { border: "#60a5fa", bg: "#00001a", text: "#bfdbfe", speed: 55 }, // 青・悲しみ（ゆっくり）
+  hope:   { border: "#fde68a", bg: "#0a0a00", text: "#fef9c3", speed: 24 }, // 黄・希望（少し速く）
+  normal: { border: "#ffffff", bg: "#000000", text: "#ffffff", speed: 30 }, // デフォルト白
+};
+
+function MessageBox({ lines, onNext, showCursor = true, mood = "normal" }) {
   const [shown, setShown]     = useState(0);
   const [charIdx, setCharIdx] = useState(0);
   const [done, setDone]       = useState(false);
   const [fast, setFast]       = useState(false);
   const timerRef = useRef(null);
   const boxRef   = useRef(null);
+  const ms = MOOD_STYLE[mood] ?? MOOD_STYLE.normal;
 
   const effectiveLines = useMemo(() => {
     if (!Array.isArray(lines)) return [];
@@ -1286,7 +1340,7 @@ function MessageBox({ lines, onNext, showCursor = true }) {
     if (shown >= effectiveLines.length) { setDone(true); return; }
     if (!effectiveLines[shown]) { setDone(true); return; }
     if (charIdx < effectiveLines[shown].length) {
-      const speed = fast ? 6 : 30;
+      const speed = fast ? 6 : ms.speed;
       timerRef.current = setTimeout(() => setCharIdx((c) => c + 1), speed);
       return () => clearTimeout(timerRef.current);
     }
@@ -1306,8 +1360,9 @@ function MessageBox({ lines, onNext, showCursor = true }) {
 
   return (
     <div ref={boxRef}
-      className="w-full border-2 border-white bg-black text-white p-4 cursor-pointer select-none h-[124px] overflow-y-auto"
-      style={{ fontFamily:"'Courier New',monospace" }}
+      className="w-full border-2 p-4 cursor-pointer select-none h-[124px] overflow-y-auto"
+      style={{ fontFamily:"'Courier New',monospace", borderColor: ms.border, background: ms.bg, color: ms.text,
+               boxShadow: mood !== "normal" ? `0 0 8px ${ms.border}55` : "none" }}
       onClick={advance}
       onPointerDown={() => setFast(true)}
       onPointerUp={() => setFast(false)}
@@ -2257,9 +2312,11 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     return Object.keys(events).map((key) => {
       const [y, x] = key.split(",").map(Number);
       if (map[y]?.[x] !== INT.NPC) return null;
+      const ev = events[key];
+      if (ev?.guard && typeof ev.passCondition === "function" && ev.passCondition(player)) return null;
       return { eventKey: key, anchorX: x, anchorY: y, x, y, fixed: !!events[key].fixedNpc };
     }).filter(Boolean);
-  }, [events, map]);
+  }, [events, map, player]);
   const [npcStates, setNpcStates] = useState([]);
   const prevInteriorTypeRef = useRef(null);
   useEffect(() => {
@@ -2291,6 +2348,13 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   const resolveEventForNpc = useCallback((eventKey) => {
     let ev = events[eventKey];
     if (!ev) return null;
+    if (ev.guard) {
+      const canPass = typeof ev.passCondition === "function" ? ev.passCondition(player) : false;
+      return {
+        ...ev,
+        messages: canPass ? (ev.passMessages || ev.messages || []) : (ev.blockMessages || ev.messages || []),
+      };
+    }
     if (interiorType === "nazoVillage" && eventKey === "2,3") {
       const ALL_FLAGS = ["hana", "neko", "kumo", "ninja"];
       const flags = player.nazoFlags ?? [];
@@ -2377,7 +2441,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
       }
     }
     return ev;
-  }, [events, interiorType, player.nazoFlags, player.nazoSpellLearned, player.bag]);
+  }, [events, interiorType, player]);
 
   const triggerEvent = useCallback((eventKey) => {
     const ev = resolveEventForNpc(eventKey);
@@ -2555,6 +2619,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     <div className={`relative flex flex-col h-full ${isCave ? "bg-gray-950" : isUnderground ? "bg-stone-950" : "bg-black"} text-white px-2 py-3 gap-2`}>
       <div className={`border p-2 text-xs text-center ${isCave ? "border-gray-800 text-gray-400" : isUnderground ? "border-stone-700 text-amber-600" : "border-gray-600 text-yellow-300"}`}>{title}</div>
       <div className="flex justify-center">
+        <div className="relative" style={{ width: cols * TS, height: rows * TS }}>
         <div className="inline-grid gap-0" style={{ gridTemplateColumns: `repeat(${cols},${TS}px)`, border: `1px solid ${isCave ? "#222" : isUnderground ? "#1c1008" : "#444"}` }}>
           {map.map((row, y) => row.map((tile, x) => {
             const isPlayer = intPos.x === x && intPos.y === y;
@@ -2610,6 +2675,8 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
             );
           }))}
         </div>
+        {isCave && <CaveDarkness intPos={intPos} TS={TS} cols={cols} rows={rows} />}
+        </div>
       </div>
       <p className="text-[10px] text-center text-gray-400">
         {isCave ? "A/Enterで調べる（机越しOK） ／ 階段で階層移動" : "A/Enterで調べる（机越しOK） ／ 出口へ乗ると外へ"}
@@ -2646,7 +2713,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
       </div>
       {intEvent && (
         <div className="absolute inset-x-2 bottom-3 z-20">
-          <MessageBox lines={intEvent.messages} onNext={handleIntEventDone} />
+          <MessageBox lines={intEvent.messages} onNext={handleIntEventDone} mood={intEvent.mood ?? "normal"} />
         </div>
       )}
     </div>
@@ -2667,7 +2734,7 @@ function EventScreen({ event, player, onDone }) {
           <p className="text-yellow-300 text-xs">{event.name}</p>
         </div>
       </div>
-      <MessageBox lines={msgs} onNext={onDone} />
+      <MessageBox lines={msgs} onNext={onDone} mood={event.mood ?? "normal"} />
     </div>
   );
 }
