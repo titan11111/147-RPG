@@ -196,27 +196,27 @@ function normalizeSavedPlayer(data) {
 
 // ─── SHOP ITEMS（3段階）──────────────────────────────────────────────────────
 const SHOP_ITEMS_T1 = [
-  { id:"iron_sword",    name:"てつのつるぎ",   slot:"weapon",    atkBonus:5,  defBonus:0,  cost:30,  desc:"こうげき+5",        type:"equip" },
-  { id:"leather_armor", name:"かわのよろい",   slot:"armor",     atkBonus:0,  defBonus:4,  cost:25,  desc:"まもり+4",          type:"equip" },
-  { id:"magic_ring",    name:"まほうのゆびわ", slot:"accessory", atkBonus:1,  defBonus:1,  cost:40,  desc:"こうげき+1 まもり+1", type:"equip" },
-  { id:"herb",          name:"やくそう",       atkBonus:0, defBonus:0, cost:10, desc:"HP+20", type:"item" },
-  { id:"potion",        name:"キズぐすり",     atkBonus:0, defBonus:0, cost:20, desc:"HP+40", type:"item" },
-  { id:"antidote",      name:"どくけしそう",   atkBonus:0, defBonus:0, cost:15, desc:"どくを　なおす", type:"item" },
+  { id:"iron_sword",    name:"アイアンブレード", slot:"weapon",    atkBonus:5,  defBonus:0,  cost:30,  desc:"こうげき+5",        type:"equip" },
+  { id:"leather_armor", name:"レザーメイル",     slot:"armor",     atkBonus:0,  defBonus:4,  cost:25,  desc:"まもり+4",          type:"equip" },
+  { id:"magic_ring",    name:"ルーンリング",     slot:"accessory", atkBonus:1,  defBonus:1,  cost:40,  desc:"こうげき+1 まもり+1", type:"equip" },
+  { id:"herb",          name:"みどりのハーブ",   atkBonus:0, defBonus:0, cost:10, desc:"HP+20", type:"item" },
+  { id:"potion",        name:"いやしのしずく",   atkBonus:0, defBonus:0, cost:20, desc:"HP+40", type:"item" },
+  { id:"antidote",      name:"どくけしハーブ",   atkBonus:0, defBonus:0, cost:15, desc:"どくを　なおす", type:"item" },
 ];
 
 const SHOP_ITEMS_T2 = [
-  { id:"steel_sword",   name:"はがねのつるぎ", slot:"weapon",    atkBonus:10, defBonus:0,  cost:120, desc:"こうげき+10",       type:"equip" },
-  { id:"chain_mail",    name:"くさりかたびら", slot:"armor",     atkBonus:0,  defBonus:7,  cost:100, desc:"まもり+7",          type:"equip" },
-  { id:"fire_ring",     name:"ほのおのゆびわ", slot:"accessory", atkBonus:2,  defBonus:2,  cost:150, desc:"こうげき+2 まもり+2", type:"equip" },
-  { id:"potion",        name:"キズぐすり",     atkBonus:0, defBonus:0, cost:20, desc:"HP+40", type:"item" },
-  { id:"mega_potion",   name:"まんたんのくすり", atkBonus:0, defBonus:0, cost:50, desc:"HP+80", type:"item" },
+  { id:"steel_sword",   name:"スチールブレード", slot:"weapon",    atkBonus:10, defBonus:0,  cost:120, desc:"こうげき+10",       type:"equip" },
+  { id:"chain_mail",    name:"チェインメイル",   slot:"armor",     atkBonus:0,  defBonus:7,  cost:100, desc:"まもり+7",          type:"equip" },
+  { id:"fire_ring",     name:"フレアリング",     slot:"accessory", atkBonus:2,  defBonus:2,  cost:150, desc:"こうげき+2 まもり+2", type:"equip" },
+  { id:"potion",        name:"いやしのしずく",   atkBonus:0, defBonus:0, cost:20, desc:"HP+40", type:"item" },
+  { id:"mega_potion",   name:"げんきのエリクサ", atkBonus:0, defBonus:0, cost:50, desc:"HP+80", type:"item" },
 ];
 
 const SHOP_ITEMS_T3 = [
-  { id:"dragon_sword",  name:"りゅうのつるぎ", slot:"weapon",    atkBonus:16, defBonus:0,  cost:300, desc:"こうげき+16",       type:"equip" },
-  { id:"magic_armor",   name:"まほうのよろい", slot:"armor",     atkBonus:0,  defBonus:12, cost:280, desc:"まもり+12",         type:"equip" },
-  { id:"holy_charm",    name:"せいなるおまもり", slot:"accessory", atkBonus:3,  defBonus:5,  cost:350, desc:"こうげき+3 まもり+5", type:"equip" },
-  { id:"mega_potion",   name:"まんたんのくすり", atkBonus:0, defBonus:0, cost:50, desc:"HP+80", type:"item" },
+  { id:"dragon_sword",  name:"ドラゴブレード",   slot:"weapon",    atkBonus:16, defBonus:0,  cost:300, desc:"こうげき+16",       type:"equip" },
+  { id:"magic_armor",   name:"ルーンアーマー",   slot:"armor",     atkBonus:0,  defBonus:12, cost:280, desc:"まもり+12",         type:"equip" },
+  { id:"holy_charm",    name:"せいれいのおまもり", slot:"accessory", atkBonus:3,  defBonus:5,  cost:350, desc:"こうげき+3 まもり+5", type:"equip" },
+  { id:"mega_potion",   name:"げんきのエリクサ", atkBonus:0, defBonus:0, cost:50, desc:"HP+80", type:"item" },
 ];
 
 // 装備IDから装備データを引くための辞書
@@ -229,10 +229,10 @@ const SHOP_ITEMS = SHOP_ITEMS_T1; // 後方互換
 
 // ─── ITEMS ────────────────────────────────────────────────────────────────────
 const ITEMS = {
-  herb:        { name:"やくそう", heal:20 },
-  potion:      { name:"キズぐすり", heal:40 },
-  mega_potion: { name:"まんたんのくすり", heal:80 },
-  antidote:    { name:"どくけしそう", heal:0, curePoison:true },
+  herb:        { name:"みどりのハーブ", heal:20 },
+  potion:      { name:"いやしのしずく", heal:40 },
+  mega_potion: { name:"げんきのエリクサ", heal:80 },
+  antidote:    { name:"どくけしハーブ", heal:0, curePoison:true },
   neko_konnyaku: { name:"ねこねここんにゃく", heal:0 },
   manabi_proof:  { name:"まなびのあかし",   heal:0, keyItem:true },
   ancient_key:   { name:"ふるびたかぎ",     heal:0, keyItem:true },
@@ -735,10 +735,10 @@ const CAVE_EVENTS_BY_FLOOR = {
 
 const CAVE_TREASURES_BY_FLOOR = {
   1: {
-    "4,8": { id: "cave:1:4,8", itemId: "antidote", amount: 1, messages: ["宝箱を　あけた！", "どくけしそうを　てにいれた！"] },
+    "4,8": { id: "cave:1:4,8", itemId: "antidote", amount: 1, messages: ["宝箱を　あけた！", "どくけしハーブを　てにいれた！"] },
   },
   2: {
-    "3,4": { id: "cave:2:3,4", itemId: "mega_potion", amount: 1, messages: ["宝箱を　あけた！", "まんたんのくすりを　てにいれた！"] },
+    "3,4": { id: "cave:2:3,4", itemId: "mega_potion", amount: 1, messages: ["宝箱を　あけた！", "げんきのエリクサを　てにいれた！"] },
   },
   3: {},
 };
@@ -1166,15 +1166,15 @@ const INTERIOR_EVENTS = {
 
 const INTERIOR_TREASURES = {
   village: {
-    "5,5": { id: "village:5,5", itemId: "herb", amount: 1, messages: ["宝箱を　あけた！", "やくそうを　てにいれた！"] },
+    "5,5": { id: "village:5,5", itemId: "herb", amount: 1, messages: ["宝箱を　あけた！", "みどりのハーブを　てにいれた！"] },
     "5,8": { id: "village:5,8", gold: 18, messages: ["宝箱を　あけた！", "18ゴールドを　てにいれた！"] },
   },
   town: {
-    "6,7": { id: "town:6,7", itemId: "potion", amount: 1, messages: ["宝箱を　あけた！", "キズぐすりを　てにいれた！"] },
+    "6,7": { id: "town:6,7", itemId: "potion", amount: 1, messages: ["宝箱を　あけた！", "いやしのしずくを　てにいれた！"] },
     "6,8": { id: "town:6,8", gold: 35, messages: ["宝箱を　あけた！", "35ゴールドを　てにいれた！"] },
   },
   underground: {
-    "12,8": { id: "underground:12,8", itemId: "mega_potion", amount: 2, messages: ["石の宝箱を　あけた！", "まんたんのくすり×2を　てにいれた！"] },
+    "12,8": { id: "underground:12,8", itemId: "mega_potion", amount: 2, messages: ["石の宝箱を　あけた！", "げんきのエリクサ×2を　てにいれた！"] },
   },
 };
 
