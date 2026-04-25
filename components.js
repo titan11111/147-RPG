@@ -2242,8 +2242,6 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
   const currentTile = MAP_GRID[pos.y][pos.x];
   const progress = getMainProgress(player);
   const objective = getNextObjective(player);
-  const hasShip = canUseShip(player);
-  const hasAirship = canUseAirship(player);
 
   // キーボード操作
   useEffect(() => {
@@ -2294,15 +2292,10 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
     <div className="flex flex-col h-full bg-black text-white px-2 py-3 gap-3">
       {/* ステータス */}
       <div className="border border-gray-600 p-2 text-xs grid grid-cols-2 gap-1">
-        <span className="text-yellow-300">{player.name}</span>
+        <span className="text-yellow-300">{player.name}　<span className="text-cyan-200 text-[10px]">{progress.title}</span></span>
         <span className="text-right text-gray-400">Lv.{player.level}　<span className="text-blue-300">{timeLabel}</span></span>
         <HPBar label="HP" current={player.hp} max={player.maxHp} />
         <HPBar label="MP" current={player.mp} max={player.maxMp} color="blue" />
-        <span className="text-[10px] text-cyan-200">称号：{progress.title}</span>
-        <span className="text-right text-[10px] text-gray-300">進行率 {progress.percent}%</span>
-        <div className="col-span-2 bg-gray-800 border border-gray-700 h-2 rounded overflow-hidden">
-          <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${progress.percent}%` }} />
-        </div>
       </div>
 
       {/* マップビュー + ミニマップ */}
@@ -2343,13 +2336,7 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
           ? `道しるべ ${signData.arrow} ${signData.name}`
           : event ? `現在地 ${event.name}`
           : `現在地 ${tileName[currentTile]} (${pos.x},${pos.y})`}
-        <div className="mt-1 text-[10px] text-gray-400">
-          {canInvestigate ? "A/Enterで　はいる" : "SELECTで　メニュー / Qでクイックセーブ"}
-        </div>
         <div className="mt-1 text-[10px] text-cyan-300">次の目的：{objective}</div>
-        <div className="mt-1 text-[10px] text-sky-200">
-          移動手段：{hasAirship ? "飛行船（山脈・海・川を越えられる）" : hasShip ? "船（海・川を渡れる）" : "徒歩（陸地のみ）"}
-        </div>
         {(player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && (
           <div className="mt-1 text-[10px] text-yellow-300">🐱 猫のともだちが　ついてきている　にゃ</div>
         )}

@@ -22,6 +22,7 @@ function App() {
   const bgmAudioMapRef = useRef({});
   const currentBgmRef = useRef(null);
   const moveHintLockRef = useRef(0);
+  const gameOverSfxLockRef = useRef(false);
   const hasOwn = useCallback((obj, key) => Object.prototype.hasOwnProperty.call(obj, key), []);
 
   const canEnterWorldTile = useCallback((tile, actor) => {
@@ -203,6 +204,37 @@ function App() {
     osc.stop(ctx.currentTime + 0.065);
   }, []);
 
+  const playGameOver = useCallback(() => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+    // C5 -> G4 -> E4 -> C4 (ファミコン風の下降音階)
+    const notes = [
+      { freq: 523, time: 0.0 },
+      { freq: 392, time: 0.35 },
+      { freq: 330, time: 0.70 },
+      { freq: 262, time: 1.05 },
+    ];
+    const now = ctx.currentTime;
+    notes.forEach(({ freq, time }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, now + time);
+
+      gain.gain.setValueAtTime(0.25, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + time + 0.28);
+
+      osc.start(now + time);
+      osc.stop(now + time + 0.3);
+    });
+  }, []);
+
   const startBgm = useCallback((scene = "field") => {
     if (!bgmAudioMapRef.current.fieldA) return;
     const trackSet = BGM_SCENES[scene] ?? BGM_SCENES.field;
@@ -285,6 +317,9 @@ function App() {
   }, [screen, interiorType, isBoss, hasPlayer, startBgm, stopBgm]);
 
   useEffect(() => () => stopBgm(), [stopBgm]);
+  useEffect(() => {
+    if (screen !== SCREEN.GAMEOVER) gameOverSfxLockRef.current = false;
+  }, [screen]);
 
   // iOS Safari: 復帰時にBGM再生が止まりやすいので再開を試みる
   useEffect(() => {
@@ -329,7 +364,13 @@ function App() {
     return () => frame.removeEventListener("pointerdown", onPointerDown);
   }, [playUiClick]);
 
-  const handleLose = useCallback(() => { stopBgm(); setScreen(SCREEN.GAMEOVER); }, [stopBgm]);
+  const handleLose = useCallback(() => {
+    if (gameOverSfxLockRef.current) return;
+    gameOverSfxLockRef.current = true;
+    stopBgm();
+    playGameOver();
+    setScreen(SCREEN.GAMEOVER);
+  }, [playGameOver, stopBgm]);
   const handleFlee = useCallback(() => { startBgm("field"); setScreen(SCREEN.MAP); }, [startBgm]);
 
   const startGame = () => { startBgm("field"); setScreen(SCREEN.NAME); };
