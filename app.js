@@ -21,7 +21,27 @@ function App() {
   const bgmCycleRef  = useRef({ field: 0, town: 0, battle: 0 });
   const bgmAudioMapRef = useRef({});
   const currentBgmRef = useRef(null);
+  const moveHintLockRef = useRef(0);
   const hasOwn = useCallback((obj, key) => Object.prototype.hasOwnProperty.call(obj, key), []);
+
+  const canEnterWorldTile = useCallback((tile, actor) => {
+    const hasAirship = canUseAirship(actor);
+    const hasShip = canUseShip(actor);
+    if (hasAirship) return true;
+    if (tile === TILE.MOUNTAIN) return false;
+    if ([TILE.SEA, TILE.LAKE, TILE.WATER].includes(tile)) return hasShip;
+    return true;
+  }, []);
+
+  const movementBlockMessage = useCallback((tile, actor) => {
+    if (tile === TILE.MOUNTAIN && !canUseAirship(actor)) {
+      return ["山脈が　行く手を　ふさいでいる。", "飛行船があれば　越えられそうだ。"];
+    }
+    if ([TILE.SEA, TILE.LAKE, TILE.WATER].includes(tile) && !canUseShip(actor)) {
+      return ["水辺が　行く手を　ふさいでいる。", "船を手に入れれば　渡れそうだ。"];
+    }
+    return null;
+  }, []);
 
   // セーブデータの存在チェック（マウント時）
   useEffect(() => {
@@ -250,11 +270,11 @@ function App() {
       return;
     }
     if (screen === SCREEN.INTERIOR) {
-      if (["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || "")) {
+      if (["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || "")) {
         startBgm("town");
         return;
       }
-      if (interiorType === "cave") {
+      if (interiorType === "cave" || interiorType === "catCave") {
         stopBgm();
         return;
       }
@@ -278,9 +298,9 @@ function App() {
       }
       const scene = screen === SCREEN.BATTLE
         ? (isBoss ? "boss" : "battle")
-        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || ""))
+        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || ""))
           ? "town"
-          : (screen === SCREEN.INTERIOR && interiorType === "cave")
+          : (screen === SCREEN.INTERIOR && (interiorType === "cave" || interiorType === "catCave"))
             ? null
             : "field";
       if (scene) startBgm(scene);
@@ -332,18 +352,26 @@ function App() {
 
   const handleMove = (dx, dy) => {
     const now = performance.now();
-    if (now - moveLockRef.current < 70) return;
+    if (now - moveLockRef.current < 50) return;
     moveLockRef.current = now;
     setPlayer(prev => {
-      const nx = clamp(prev.pos.x + dx, 0, MAP_SIZE - 1);
-      const ny = clamp(prev.pos.y + dy, 0, MAP_SIZE - 1);
+      const nx = wrapCoord(prev.pos.x + dx, MAP_SIZE);
+      const ny = wrapCoord(prev.pos.y + dy, MAP_SIZE);
 
       const dir =
         dx ===  1 ? "right" : dx === -1 ? "left" :
         dy === -1 ? "up"    : "down";
 
       const tile = MAP_GRID[ny][nx];
-      if ([TILE.SEA, TILE.LAKE].includes(tile)) return { ...prev, direction: dir };
+      if (!canEnterWorldTile(tile, prev)) {
+        const hint = movementBlockMessage(tile, prev);
+        const nowTs = Date.now();
+        if (hint && nowTs - moveHintLockRef.current > 1200) {
+          moveHintLockRef.current = nowTs;
+          setPendingMsg(hint);
+        }
+        return { ...prev, direction: dir };
+      }
 
       const newVisited = new Set(prev.visited);
       newVisited.add(`${ny},${nx}`);
@@ -354,8 +382,9 @@ function App() {
         const newCounter = moved.encounterCounter - 1;
         if (newCounter <= 0) {
           const enemy = getEnemyForZone(tile, { x: nx, y: ny }, isNight);
-          setTimeout(() => { setCurrentEnemy(enemy); setIsBoss(false); setScreen(SCREEN.BATTLE); }, 100);
-          moved = { ...moved, encounterCounter: getEncounterCounter() };
+          const tuned = tuneEnemyForPhase(enemy, moved, { isBoss: false, tile });
+          setTimeout(() => { setCurrentEnemy(tuned); setIsBoss(false); setScreen(SCREEN.BATTLE); }, 100);
+          moved = { ...moved, encounterCounter: getEncounterCounterForPlayer(moved) };
         } else {
           moved = { ...moved, encounterCounter: newCounter };
         }
@@ -368,8 +397,54 @@ function App() {
     if (!player) return;
     const key = `${player.pos.y},${player.pos.x}`;
     if (!hasOwn(LOCATION_EVENTS, key)) return;
+    const mapEvent = LOCATION_EVENTS[key];
+    if (mapEvent?.rewardFlag && hasStoryFlag(player, mapEvent.rewardFlag)) {
+      setCurrentEvent({ messages: [
+        "すでに　この地の力は　受け取っている。",
+        mapEvent.rewardFlag === "story:airshipUnlocked"
+          ? "飛行船は　いつでも　君の合図を待っている。"
+          : "船は　いつでも　桟橋で待っている。",
+      ]});
+      setScreen(SCREEN.EVENT);
+      return;
+    }
+    if (mapEvent?.requireStoryFlag && !hasStoryFlag(player, mapEvent.requireStoryFlag)) {
+      const guide = mapEvent.requireStoryFlag === "story:shipUnlocked"
+        ? "まずは船を手に入れよう。"
+        : "王城で使命を受け、世界を巡ってから来よう。";
+      setCurrentEvent({ messages: [
+        "まだ　準備が足りないようだ。",
+        guide,
+      ]});
+      setScreen(SCREEN.EVENT);
+      return;
+    }
+    if (Array.isArray(mapEvent?.requireItems) && mapEvent.requireItems.some((itemId) => !hasBagItem(player, itemId))) {
+      setCurrentEvent({ messages: [
+        "古い装置が　反応しない……。",
+        "3つのあかしを　そろえる必要がありそうだ。",
+      ]});
+      setScreen(SCREEN.EVENT);
+      return;
+    }
     const caveKey = `${SPECIAL_POS.cave.y},${SPECIAL_POS.cave.x}`;
     if (key === caveKey) {
+      if (!hasStoryFlag(player, "story:airshipUnlocked")) {
+        setCurrentEvent({ messages: [
+          "洞窟の周囲は　山脈に囲まれている。",
+          "飛行船がなければ　この先へは進めない。",
+        ]});
+        setScreen(SCREEN.EVENT);
+        return;
+      }
+      if (!hasStoryFlag(player, "story:royalQuest")) {
+        setCurrentEvent({ messages: [
+          "洞窟の入口に　重い封印がかかっている。",
+          "王城で使命を受けてからでなければ　進めないようだ。",
+        ]});
+        setScreen(SCREEN.EVENT);
+        return;
+      }
       const KEY_ITEMS = ["manabi_proof", "ancient_key", "dragon_scale"];
       const ITEM_NAMES = { manabi_proof: "まなびのあかし", ancient_key: "ふるびたかぎ", dragon_scale: "ドラゴンのウロコ" };
       const bag = player.bag || [];
@@ -384,7 +459,7 @@ function App() {
         return;
       }
     }
-    setCurrentEvent(LOCATION_EVENTS[key]);
+    setCurrentEvent(mapEvent);
     setScreen(SCREEN.EVENT);
   };
 
@@ -397,9 +472,18 @@ function App() {
     }
     if (hasOwn(ev, "heal"))     setPlayer(p => ({ ...p, hp: p.maxHp, mp: p.maxMp }));
     if (hasOwn(ev, "buff"))     setPlayer(p => ({ ...p, atk: p.atk + ev.buff.val }));
+    if (hasOwn(ev, "rewardFlag")) {
+      setPlayer((p) => {
+        if (!p) return p;
+        const flags = p.storyFlags || [];
+        if (flags.includes(ev.rewardFlag)) return p;
+        return { ...p, storyFlags: [...flags, ev.rewardFlag] };
+      });
+    }
     if (hasOwn(ev, "save"))     saveGame();
+    if (hasOwn(ev, "gotoEnding")) { setScreen(SCREEN.ENDING); return; }
     if (hasOwn(ev, "interior")) { setInteriorType(ev.interior); setScreen(SCREEN.INTERIOR); return; }
-    if (hasOwn(ev, "boss"))     { setCurrentEnemy(BOSS_ENEMY); setIsBoss(true); setScreen(SCREEN.BATTLE); return; }
+    if (hasOwn(ev, "boss"))     { setCurrentEnemy(tuneEnemyForPhase(BOSS_ENEMY, player, { isBoss: true })); setIsBoss(true); setScreen(SCREEN.BATTLE); return; }
     setScreen(SCREEN.MAP);
   };
 
@@ -469,7 +553,8 @@ function App() {
         const itemData = ITEMS[dr.id];
         const bag = [...(updated.bag || [])];
         const total = bag.reduce((s, i) => s + i.count, 0);
-        if (total < 9 && itemData) {
+        const allowOverCapacity = dr.id === "neko_konnyaku";
+        if ((total < 9 || allowOverCapacity) && itemData) {
           const matched = bag.find(i => i.id === dr.id);
           if (matched) matched.count += 1;
           else bag.push({ id:dr.id, name:itemData.name, heal:itemData.heal, curePoison: !!itemData.curePoison, count:1 });
@@ -480,17 +565,58 @@ function App() {
       const prevLevel = updated.level;
       updated = checkLevelUp(updated);
       if (updated.level > prevLevel) {
-        levelUpInfo = { name: updated.name, level: updated.level };
+        const learnedSpells = getSpellsLearnedBetweenLevels(prevLevel, updated.level, updated.nazoSpellLearned)
+          .map((spell) => spell.name);
+        levelUpInfo = { name: updated.name, level: updated.level, learnedSpells };
+      }
+      if (isBoss) {
+        const flags = updated.storyFlags || [];
+        if (!flags.includes("story:drangoDefeated")) {
+          updated = { ...updated, storyFlags: [...flags, "story:drangoDefeated"] };
+        }
+      } else {
+        // 3連戦で崩れにくいよう、勝利後に小回復
+        const recoverHp = Math.max(2, Math.floor(updated.maxHp * 0.10));
+        const recoverMp = 1;
+        updated = {
+          ...updated,
+          hp: Math.min(updated.maxHp, updated.hp + recoverHp),
+          mp: Math.min(updated.maxMp, updated.mp + recoverMp),
+        };
       }
       return updated;
     });
-    if (isBoss) { setScreen(SCREEN.ENDING); return; }
+    if (isBoss) {
+      const hasSecretTitle = (player?.storyFlags || []).includes("story:titleStarlight");
+      setCurrentEvent({
+        name: "決着",
+        mood: "hope",
+        gotoEnding: true,
+        messages: hasSecretTitle ? [
+          "ドランゴは　崩れ落ちた……。",
+          "闇がほどけ、世界に　朝の光が戻ってくる。",
+          "『星あかりの冒険者』の名が、遠くで語られはじめた。",
+        ] : [
+          "ドランゴは　崩れ落ちた……。",
+          "長い夜が終わり、世界に　朝の光が戻ってくる。",
+          "旅人の一歩が　この国の夜明けになった。",
+        ],
+      });
+      setScreen(SCREEN.EVENT);
+      return;
+    }
     const msgs = [`${currentEnemy.name}を　たおした！`, `けいけんちを ${exp}　手に入れた！`, `${gold}ゴールドを　もらった！`];
+    msgs.push("深呼吸して　体勢を立て直した。（HP少し回復 / MP+1）");
     if (dropMsg) msgs.push(dropMsg);
     if (levelUpInfo) {
       msgs.push(`🌟 ${levelUpInfo.name}の　レベルが　あがった！`);
       msgs.push(`　★ レベル ${levelUpInfo.level} に　なった！`);
       msgs.push(`HP・MP・こうげきが　上がった！`);
+      if (levelUpInfo.learnedSpells && levelUpInfo.learnedSpells.length > 0) {
+        levelUpInfo.learnedSpells.forEach((spellName) => {
+          msgs.push(`✨ あたらしい　じゅもん「${spellName}」を　おぼえた！`);
+        });
+      }
       setTimeout(() => playLevelUpSound(), 100);
     }
     setPendingMsg(msgs);
@@ -509,7 +635,7 @@ function App() {
     setInteriorType(null);
     setScreen(SCREEN.MAP);
     setShowInfo(false);
-    setPendingMsg([`${pos.x},${pos.y}へ　ルーラした！`]);
+    setPendingMsg([`${pos.x},${pos.y}へ　しるべ移動した！`]);
   }, []);
 
   return (
@@ -531,17 +657,37 @@ function App() {
         {screen === SCREEN.GENDER   && <GenderScreen playerName={tempName} onConfirm={handleGenderConfirm} />}
         {screen === SCREEN.PROLOGUE && <PrologueScreen playerName={player?.name} onDone={handlePrologueDone} />}
         {screen === SCREEN.MAP      && player && (
-          <MapScreen player={player} onMove={handleMove} onInvestigate={handleInvestigate} onInfo={() => setShowInfo(true)} isNight={isNight} />
+          <MapScreen
+            player={player}
+            onMove={handleMove}
+            onInvestigate={handleInvestigate}
+            onInfo={() => setShowInfo(true)}
+            onQuickSave={saveGame}
+            isNight={isNight}
+          />
         )}
         {screen === SCREEN.INTERIOR && player && interiorType && (
           <InteriorMapScreen
             interiorType={interiorType}
             player={player}
-            onHeal={amt => setPlayer(p => ({ ...p, hp: Math.min(p.maxHp, p.hp + amt) }))}
+            onHeal={(healData) => setPlayer((p) => {
+              if (!p) return p;
+              const amount = typeof healData === "number" ? healData : Number(healData?.amount || 0);
+              const fullRecovery = typeof healData === "object" && !!healData?.fullRecovery;
+              if (fullRecovery) return { ...p, hp: p.maxHp, mp: p.maxMp };
+              return { ...p, hp: Math.min(p.maxHp, p.hp + amount) };
+            })}
             onBuff={buff => setPlayer(p => ({ ...p, atk: p.atk + (buff.val || 0) }))}
             onExit={() => setScreen(SCREEN.MAP)}
             onInfo={() => setShowInfo(true)}
-            onBoss={() => { setCurrentEnemy(BOSS_ENEMY); setIsBoss(true); setScreen(SCREEN.BATTLE); }}
+            onBoss={() => { setCurrentEnemy(tuneEnemyForPhase(BOSS_ENEMY, player, { isBoss: true })); setIsBoss(true); setScreen(SCREEN.BATTLE); }}
+            onEnemyBattle={(enemyId) => {
+              const baseEnemy = ENEMY_BY_ID[enemyId];
+              if (!baseEnemy) return;
+              setCurrentEnemy(tuneEnemyForPhase(baseEnemy, player, { isBoss: false }));
+              setIsBoss(false);
+              setScreen(SCREEN.BATTLE);
+            }}
             onBuy={handleBuy}
             onOpenTreasure={handleOpenTreasure}
             onFlag={flagKey => setPlayer(p => {

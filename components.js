@@ -21,13 +21,10 @@ function MiniMap({ player }) {
     const cx = player.pos.x, cy = player.pos.y;
     for (let dy = -MINI_R; dy <= MINI_R; dy++) {
       for (let dx = -MINI_R; dx <= MINI_R; dx++) {
-        const wx = cx + dx, wy = cy + dy;
+        const wx = wrapCoord(cx + dx, MAP_SIZE);
+        const wy = wrapCoord(cy + dy, MAP_SIZE);
         const px = (dx + MINI_R) * MINI_PX, py = (dy + MINI_R) * MINI_PX;
-        if (wx < 0 || wy < 0 || wx >= MAP_SIZE || wy >= MAP_SIZE) {
-          ctx.fillStyle = "#000";
-        } else {
-          ctx.fillStyle = MINI_COLOR[MAP_GRID[wy][wx]] ?? "#333";
-        }
+        ctx.fillStyle = MINI_COLOR[MAP_GRID[wy][wx]] ?? "#333";
         ctx.fillRect(px, py, MINI_PX, MINI_PX);
       }
     }
@@ -125,7 +122,7 @@ function HeroSprite({ gender, direction = "down", animStep = 0, size = 30 }) {
 }
 
 // ─── NPC SPRITE (Canvas shapes) ──────────────────────────────────────────────
-function NpcSprite({ bodyColor = "#a3e635", hairColor = "#1a0a00", size = 28 }) {
+function NpcSprite({ bodyColor = "#a3e635", hairColor = "#1a0a00", size = 28, role = "villager" }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -141,6 +138,17 @@ function NpcSprite({ bodyColor = "#a3e635", hairColor = "#1a0a00", size = 28 }) 
     ctx.fillStyle = "#4b5563";
     ctx.fillRect(cx - 4, s * 0.65, 3, s * 0.2);
     ctx.fillRect(cx + 1, s * 0.65, 3, s * 0.2);
+
+    if (role === "princess") {
+      ctx.fillStyle = "#f472b6";
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, s * 0.66);
+      ctx.lineTo(cx + 6, s * 0.66);
+      ctx.lineTo(cx + 9, s * 0.9);
+      ctx.lineTo(cx - 9, s * 0.9);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     // 胴体
     ctx.fillStyle = bodyColor;
@@ -158,13 +166,47 @@ function NpcSprite({ bodyColor = "#a3e635", hairColor = "#1a0a00", size = 28 }) 
     ctx.arc(cx, s * 0.21, s * 0.15, Math.PI, 0);
     ctx.fill();
 
+    if (role === "king" || role === "princess") {
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, s * 0.08);
+      ctx.lineTo(cx - 3, s * 0.02);
+      ctx.lineTo(cx, s * 0.08);
+      ctx.lineTo(cx + 3, s * 0.02);
+      ctx.lineTo(cx + 6, s * 0.08);
+      ctx.lineTo(cx + 6, s * 0.14);
+      ctx.lineTo(cx - 6, s * 0.14);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (role === "king") {
+      ctx.fillStyle = "#fef3c7";
+      ctx.fillRect(cx - 2, s * 0.43, 4, s * 0.1);
+      ctx.fillStyle = "#991b1b";
+      ctx.fillRect(cx - 8, s * 0.36, 2, s * 0.28);
+      ctx.fillRect(cx + 6, s * 0.36, 2, s * 0.28);
+    }
+
+    if (role === "guard") {
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(cx + 7, s * 0.28, 1.5, s * 0.52);
+      ctx.fillStyle = "#e2e8f0";
+      ctx.beginPath();
+      ctx.moveTo(cx + 8, s * 0.24);
+      ctx.lineTo(cx + 12, s * 0.3);
+      ctx.lineTo(cx + 8, s * 0.34);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     // 目
     ctx.fillStyle = "#1a0a00";
     ctx.beginPath();
     ctx.arc(cx - 2, s * 0.25, 1.2, 0, Math.PI * 2);
     ctx.arc(cx + 2, s * 0.25, 1.2, 0, Math.PI * 2);
     ctx.fill();
-  }, [bodyColor, hairColor, size]);
+  }, [bodyColor, hairColor, size, role]);
 
   return <canvas ref={canvasRef} width={size} height={size}
            style={{ imageRendering:"pixelated", display:"block" }} />;
@@ -275,6 +317,85 @@ function CatNpcSprite({ furColor = "#fca5a5", markColor = "#7c2d12", size = 28 }
       ctx.stroke();
     }
   }, [furColor, markColor, size]);
+
+  return <canvas ref={canvasRef} width={size} height={size}
+           style={{ imageRendering:"pixelated", display:"block" }} />;
+}
+
+function DogNpcSprite({ furColor = "#c8834a", earColor = "#7c2d12", size = 28 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const s = size;
+    const cx = s / 2;
+    ctx.clearRect(0, 0, s, s);
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath();
+    ctx.ellipse(cx, s * 0.88, s * 0.24, s * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 胴体
+    ctx.fillStyle = furColor;
+    ctx.beginPath();
+    ctx.ellipse(cx, s * 0.62, s * 0.24, s * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // しっぽ
+    ctx.strokeStyle = earColor;
+    ctx.lineWidth = Math.max(2, s * 0.08);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.16, s * 0.64);
+    ctx.quadraticCurveTo(cx + s * 0.35, s * 0.5, cx + s * 0.28, s * 0.3);
+    ctx.stroke();
+
+    // 頭
+    ctx.fillStyle = furColor;
+    ctx.beginPath();
+    ctx.arc(cx, s * 0.34, s * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 耳
+    const ear = (side) => {
+      ctx.fillStyle = earColor;
+      ctx.beginPath();
+      ctx.moveTo(cx + side * s * 0.08, s * 0.2);
+      ctx.lineTo(cx + side * s * 0.2, s * 0.08);
+      ctx.lineTo(cx + side * s * 0.16, s * 0.26);
+      ctx.closePath();
+      ctx.fill();
+    };
+    ear(-1);
+    ear(1);
+
+    // 鼻口
+    ctx.fillStyle = "#1f2937";
+    ctx.beginPath();
+    ctx.arc(cx, s * 0.38, Math.max(1.2, s * 0.028), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = Math.max(1, s * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(cx, s * 0.39);
+    ctx.lineTo(cx, s * 0.45);
+    ctx.stroke();
+
+    // 目
+    ctx.fillStyle = "#111827";
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.065, s * 0.31, Math.max(1.2, s * 0.022), 0, Math.PI * 2);
+    ctx.arc(cx + s * 0.065, s * 0.31, Math.max(1.2, s * 0.022), 0, Math.PI * 2);
+    ctx.fill();
+
+    // 足
+    ctx.fillStyle = "#4b5563";
+    ctx.fillRect(cx - s * 0.16, s * 0.72, s * 0.08, s * 0.12);
+    ctx.fillRect(cx + s * 0.08, s * 0.72, s * 0.08, s * 0.12);
+  }, [furColor, earColor, size]);
 
   return <canvas ref={canvasRef} width={size} height={size}
            style={{ imageRendering:"pixelated", display:"block" }} />;
@@ -568,14 +689,14 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
 
     // ドット絵（画像）がある場合は画像で描画する（無ければ従来の図形描画）
     // 戦闘中の敵ドット: `./images/enemy-${id}.png`（透過PNG想定）。タイトル画面とは別。無ければベクター。
-    const getEnemyImage = (id) => {
+    const getEnemyImage = (enemyData) => {
       if (!EnemySprite.__imgCache) EnemySprite.__imgCache = new Map();
       const cache = EnemySprite.__imgCache;
-      if (cache.has(id)) return cache.get(id);
+      const file = enemyData?.formImageFile ?? ENEMY_BATTLE_IMAGE_FILE[enemyData?.id] ?? `enemy-${enemyData?.id}.png`;
+      if (cache.has(file)) return cache.get(file);
       const img = new Image();
-      const file = ENEMY_BATTLE_IMAGE_FILE[id] ?? `enemy-${id}.png`;
       img.src = `./images/${file}`;
-      cache.set(id, img);
+      cache.set(file, img);
       return img;
     };
 
@@ -591,7 +712,7 @@ function EnemySprite({ enemy, size = 72, flash = false }) {
     const accent = isDrango ? (flash ? "#f59e0b" : "#fbbf24") : accentBase;
     const outline = "#0b0f17";
 
-    const img = getEnemyImage(enemy.id);
+    const img = getEnemyImage(enemy);
     const canUseImage = img && img.complete && img.naturalWidth > 0;
     const drawFromImage = () => {
       ctx.clearRect(0, 0, s, s);
@@ -1305,10 +1426,10 @@ function CaveDarkness({ intPos, TS, cols, rows }) {
 
 // mood → ウィンドウ演出マップ
 const MOOD_STYLE = {
-  warn:   { border: "#ef4444", bg: "#1a0000", text: "#fca5a5", speed: 28 }, // 赤・警告
-  sad:    { border: "#60a5fa", bg: "#00001a", text: "#bfdbfe", speed: 55 }, // 青・悲しみ（ゆっくり）
-  hope:   { border: "#fde68a", bg: "#0a0a00", text: "#fef9c3", speed: 24 }, // 黄・希望（少し速く）
-  normal: { border: "#ffffff", bg: "#000000", text: "#ffffff", speed: 30 }, // デフォルト白
+  warn:   { border: "#ef4444", bg: "#1a0000", text: "#fca5a5", speed: 22 }, // 赤・警告
+  sad:    { border: "#60a5fa", bg: "#00001a", text: "#bfdbfe", speed: 38 }, // 青・悲しみ（ややゆっくり）
+  hope:   { border: "#fde68a", bg: "#0a0a00", text: "#fef9c3", speed: 18 }, // 黄・希望（速め）
+  normal: { border: "#ffffff", bg: "#000000", text: "#ffffff", speed: 20 }, // デフォルト白
 };
 
 function MessageBox({ lines, onNext, showCursor = true, mood = "normal" }) {
@@ -2089,7 +2210,7 @@ function PrologueScreen({ playerName, onDone }) {
 }
 
 // ─── MAP SCREEN (スプライト + キーボード対応) ─────────────────────────────────
-function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
+function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight = false }) {
   const handleMovePointer = (dx, dy) => (e) => {
     e.preventDefault();
     onMove(dx, dy);
@@ -2100,9 +2221,13 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
   const signData = SIGN_MAP[key];
   const canInvestigate = Boolean(event);
   const half   = Math.floor(VIEW_SIZE / 2);
-  const startX = clamp(pos.x - half, 0, MAP_SIZE - VIEW_SIZE);
-  const startY = clamp(pos.y - half, 0, MAP_SIZE - VIEW_SIZE);
-  const viewRows = MAP_GRID.slice(startY, startY + VIEW_SIZE).map(row => row.slice(startX, startX + VIEW_SIZE));
+  const viewRows = Array.from({ length: VIEW_SIZE }, (_, vy) =>
+    Array.from({ length: VIEW_SIZE }, (_, vx) => {
+      const x = wrapCoord(pos.x - half + vx, MAP_SIZE);
+      const y = wrapCoord(pos.y - half + vy, MAP_SIZE);
+      return { x, y, tile: MAP_GRID[y][x] };
+    }),
+  );
 
   // 昼夜サイクル（isNight = リアルタイム3分切り替え）
   const timeLabel = isNight ? "夜" : "昼";
@@ -2112,8 +2237,13 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
     [TILE.GRASS]:"草原",[TILE.FOREST]:"森",[TILE.WATER]:"川",[TILE.MOUNTAIN]:"山岳",
     [TILE.SEA]:"海",[TILE.LAKE]:"湖",[TILE.BRIDGE]:"橋",[TILE.DESERT]:"砂漠",
     [TILE.TOWN]:"街",[TILE.SCHOOL]:"学校",[TILE.HOME]:"家",[TILE.CAVE]:"洞窟",
+    [TILE.SNOW]:"雪原",[TILE.ONSEN]:"温泉",
   };
   const currentTile = MAP_GRID[pos.y][pos.x];
+  const progress = getMainProgress(player);
+  const objective = getNextObjective(player);
+  const hasShip = canUseShip(player);
+  const hasAirship = canUseAirship(player);
 
   // キーボード操作
   useEffect(() => {
@@ -2124,10 +2254,11 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
       else if (e.key === "ArrowRight" || e.key === "d") { e.preventDefault(); onMove( 1, 0); }
       else if (e.key === "Enter" || e.key === " ")      { e.preventDefault(); onInvestigate(); }  // A = はなす
       else if (e.key === "i" || e.key === "Escape" || e.key === "x") { e.preventDefault(); onInfo(); }  // B = メニュー
+      else if (e.key === "q") { e.preventDefault(); onQuickSave && onQuickSave(); } // START = クイックセーブ
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onMove, onInvestigate, onInfo]);
+  }, [onMove, onInvestigate, onInfo, onQuickSave]);
 
   useEffect(() => {
     let rafId = null;
@@ -2167,15 +2298,19 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
         <span className="text-right text-gray-400">Lv.{player.level}　<span className="text-blue-300">{timeLabel}</span></span>
         <HPBar label="HP" current={player.hp} max={player.maxHp} />
         <HPBar label="MP" current={player.mp} max={player.maxMp} color="blue" />
+        <span className="text-[10px] text-cyan-200">称号：{progress.title}</span>
+        <span className="text-right text-[10px] text-gray-300">進行率 {progress.percent}%</span>
+        <div className="col-span-2 bg-gray-800 border border-gray-700 h-2 rounded overflow-hidden">
+          <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${progress.percent}%` }} />
+        </div>
       </div>
 
       {/* マップビュー + ミニマップ */}
       <div className="flex justify-center relative">
         <div className="relative">
           <div className="inline-grid gap-0.5" style={{ gridTemplateColumns:`repeat(${VIEW_SIZE},34px)` }}>
-            {viewRows.map((row, vy) =>
-              row.map((tile, vx) => {
-                const x = startX + vx, y = startY + vy;
+            {viewRows.map((row) =>
+              row.map(({ x, y, tile }) => {
                 const isPlayer = pos.x === x && pos.y === y;
                 const isSign   = Boolean(SIGN_MAP[`${y},${x}`]);
                 const landmarkType = getWorldLandmarkType(tile, x, y);
@@ -2209,7 +2344,11 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
           : event ? `現在地 ${event.name}`
           : `現在地 ${tileName[currentTile]} (${pos.x},${pos.y})`}
         <div className="mt-1 text-[10px] text-gray-400">
-          {canInvestigate ? "A/Enterで　はいる" : "SELECTで　メニュー"}
+          {canInvestigate ? "A/Enterで　はいる" : "SELECTで　メニュー / Qでクイックセーブ"}
+        </div>
+        <div className="mt-1 text-[10px] text-cyan-300">次の目的：{objective}</div>
+        <div className="mt-1 text-[10px] text-sky-200">
+          移動手段：{hasAirship ? "飛行船（山脈・海・川を越えられる）" : hasShip ? "船（海・川を渡れる）" : "徒歩（陸地のみ）"}
         </div>
         {(player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && (
           <div className="mt-1 text-[10px] text-yellow-300">🐱 猫のともだちが　ついてきている　にゃ</div>
@@ -2234,7 +2373,7 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
           {/* SELECT / START */}
           <div className="flex flex-col justify-end items-center gap-2 pb-1">
             <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={onInfo}>SELECT</button>
-            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={onInfo}>START</button>
+            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={() => onQuickSave && onQuickSave()}>START</button>
           </div>
           {/* B / A ボタン */}
           <div className="flex gap-2 pb-1 items-end">
@@ -2254,21 +2393,52 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, isNight = false }) {
 }
 
 // ─── INTERIOR MAP SCREEN (NEW) ────────────────────────────────────────────────
-function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInfo, onBoss, onBuy, onFlag, onLearnSpell, onOpenTreasure, onGiveItem }) {
+function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInfo, onBoss, onEnemyBattle, onBuy, onFlag, onLearnSpell, onOpenTreasure, onGiveItem }) {
   const isCave = interiorType === "cave";
+  const isCatCave = interiorType === "catCave";
+  const isDungeon = isCave || isCatCave;
+  const dungeonFloors = isCave ? CAVE_FLOORS : isCatCave ? CAT_CAVE_FLOORS : null;
+  const maxDungeonFloor = dungeonFloors ? Math.max(...Object.keys(dungeonFloors).map(Number)) : 1;
   const [currentFloor, setCurrentFloor] = useState(1);
-  const map = isCave ? (CAVE_FLOORS[currentFloor] ?? CAVE_FLOORS[1]) : (INTERIOR_MAPS[interiorType] ?? TOWN_IMAP);
-  const events = isCave ? (CAVE_EVENTS_BY_FLOOR[currentFloor] ?? {}) : (INTERIOR_EVENTS[interiorType] ?? {});
-  const treasures = isCave ? (CAVE_TREASURES_BY_FLOOR[currentFloor] ?? {}) : (INTERIOR_TREASURES[interiorType] ?? {});
+  const map = isDungeon
+    ? ((dungeonFloors && dungeonFloors[currentFloor]) || (dungeonFloors && dungeonFloors[1]) || CAVE_FLOORS[1])
+    : (INTERIOR_MAPS[interiorType] ?? TOWN_IMAP);
+  const events = isCave
+    ? (CAVE_EVENTS_BY_FLOOR[currentFloor] ?? {})
+    : isCatCave
+      ? (CAT_CAVE_EVENTS_BY_FLOOR[currentFloor] ?? {})
+      : (INTERIOR_EVENTS[interiorType] ?? {});
+  const treasures = isCave
+    ? (CAVE_TREASURES_BY_FLOOR[currentFloor] ?? {})
+    : isCatCave
+      ? (CAT_CAVE_TREASURES_BY_FLOOR[currentFloor] ?? {})
+      : (INTERIOR_TREASURES[interiorType] ?? {});
   const exitPos = findExitPos(map);
   const rows = map.length;
   const cols = map[0]?.length ?? 12;
   const isUnderground = interiorType === "underground";
-  const tileStyle = isCave ? CAVE_INT_STYLE : isUnderground ? UNDERGROUND_INT_STYLE : INT_STYLE;
+  const isCastle = interiorType === "castle";
+  const isVillage = interiorType === "village";
+  const isTown = interiorType === "town";
+  const tileStyle = isDungeon
+    ? CAVE_INT_STYLE
+    : isUnderground
+      ? UNDERGROUND_INT_STYLE
+      : isCastle
+        ? CASTLE_INT_STYLE
+        : isVillage
+          ? VILLAGE_INT_STYLE
+          : isTown
+            ? TOWN_INT_STYLE
+            : INT_STYLE;
   const title = isCave ? `くらやみの洞窟 B${currentFloor}`
+    : isCatCave ? `猫影の洞窟 B${currentFloor}`
     : isUnderground ? "地下フィールド ─ ガイア団基地"
     : interiorType === "village" ? "はじまりの村 (内部)"
     : interiorType === "town" ? "いずみの街 (内部)"
+    : interiorType === "artisanVillage" ? "職人の村 (工房街)"
+    : interiorType === "catCave" ? "猫影の洞窟"
+    : interiorType === "castle" ? "王城アストリア (城門〜玉座の間)"
     : interiorType === "manabiVillage" ? "まなびの村 (内部)"
     : interiorType === "nazoVillage" ? "謎の村 (内部)"
     : interiorType === "catVillage" ? "猫の村 (内部)"
@@ -2305,8 +2475,8 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   }, [intPos.x, intPos.y, intDir, map]);
 
   useEffect(() => {
-    if (interiorType === "cave") setCurrentFloor(1);
-  }, [interiorType]);
+    if (isDungeon) setCurrentFloor(1);
+  }, [interiorType, isDungeon]);
 
   const npcAnchors = useMemo(() => {
     return Object.keys(events).map((key) => {
@@ -2325,9 +2495,9 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   useEffect(() => {
     const switchedInterior = prevInteriorTypeRef.current !== interiorType;
     prevInteriorTypeRef.current = interiorType;
-    if (isCave && !switchedInterior) return;
+    if (isDungeon && !switchedInterior) return;
     setIntPos({ x: exitPos.x, y: Math.max(0, exitPos.y - 1) });
-  }, [exitPos.x, exitPos.y, interiorType, isCave]);
+  }, [exitPos.x, exitPos.y, interiorType, isDungeon]);
 
   const npcByPos = useMemo(() => {
     const byPos = {};
@@ -2389,6 +2559,37 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
         ]};
       }
     }
+    if (interiorType === "village" && eventKey === "1,11") {
+      const hasAllKeys = hasBagItem(player, "manabi_proof") && hasBagItem(player, "ancient_key") && hasBagItem(player, "dragon_scale");
+      const earned = (player.storyFlags || []).includes("story:titleStarlight");
+      if (hasAllKeys && player.level >= 8 && !earned) {
+        ev = { messages: [
+          "語り部：「……おまえは　もう　恐れだけで　歩いていない。」",
+          "「学び」「謎」「猫の絆」を　抱え、なお進んだ。",
+          "いまより　おまえを『星あかりの冒険者』と呼ぼう。",
+          "称号を　授かった！",
+        ], flag: "story:titleStarlight", mood: "hope" };
+      } else if (earned) {
+        ev = { messages: [
+          "語り部：「星あかりの冒険者よ。",
+          "短い旅でも　人の心を　照らすことはできる。」",
+        ], mood: "hope" };
+      } else {
+        ev = { messages: [
+          "語り部：「称号は　力ではなく　歩みの証。",
+          "3つのしるしを　抱え、さらに己を鍛えて　戻ってこい。」",
+        ]};
+      }
+    }
+    if (interiorType === "catCave" && eventKey === "3,7") {
+      const hasKonnyaku = (player.bag || []).some((i) => i.id === "neko_konnyaku" && i.count > 0);
+      if (hasKonnyaku) {
+        ev = { messages: [
+          "猫又：「にゃ。」",
+          "猫又は　満足そうに　しっぽを振っている。",
+        ]};
+      }
+    }
     if (interiorType === "catVillage" && ev.catTalk) {
       const hasKonnyaku = (player.bag || []).some((i) => i.id === "neko_konnyaku" && i.count > 0);
       const hasDragonScale = (player.bag || []).some((i) => i.id === "dragon_scale" && i.count > 0);
@@ -2446,7 +2647,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   const triggerEvent = useCallback((eventKey) => {
     const ev = resolveEventForNpc(eventKey);
     if (!ev) return false;
-    if (ev.heal) onHeal(ev.heal);
+    if (ev.heal) onHeal({ amount: ev.heal, fullRecovery: !!ev.inn || ev.heal >= 999 });
     if (ev.buff && onBuff && !usedBuffKeys.has(eventKey)) {
       onBuff(ev.buff);
       setUsedBuffKeys((s) => new Set([...s, eventKey]));
@@ -2459,8 +2660,9 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   }, [resolveEventForNpc, onHeal, onBuff, usedBuffKeys, onFlag, onLearnSpell]);
 
   useEffect(() => {
-    const movableInteriors = ["village", "town", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"];
+    const movableInteriors = ["village", "town", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"];
     if (!movableInteriors.includes(interiorType)) return undefined;
+    if (intEvent || showShop) return undefined;
     const timer = setInterval(() => {
       setNpcStates((prev) => {
         const taken = new Set(prev.map((n) => `${n.y},${n.x}`));
@@ -2488,7 +2690,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
       });
     }, 820);
     return () => clearInterval(timer);
-  }, [interiorType, map, cols, rows, intPos.x, intPos.y]);
+  }, [interiorType, map, cols, rows, intPos.x, intPos.y, intEvent, showShop]);
 
   const tryMove = useCallback((dx, dy) => {
     const dir = dx === 1 ? "right" : dx === -1 ? "left" : dy === -1 ? "up" : "down";
@@ -2502,9 +2704,9 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
 
     const tile = map[ny][nx];
     if (tile === INT.EXIT) { onExit(); return; }
-    if (tile === INT.STAIRS_DOWN && isCave && currentFloor < 3) {
+    if (tile === INT.STAIRS_DOWN && isDungeon && currentFloor < maxDungeonFloor) {
       const nextFloor = currentFloor + 1;
-      const nextMap = CAVE_FLOORS[nextFloor];
+      const nextMap = dungeonFloors?.[nextFloor];
       if (!nextMap) return;
       let stair = { x: nx, y: ny };
       for (let y = 0; y < nextMap.length; y++) {
@@ -2517,10 +2719,10 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
       setIntPos(spawn);
       return;
     }
-    if (tile === INT.STAIRS_UP && isCave) {
+    if (tile === INT.STAIRS_UP && isDungeon) {
       if (currentFloor <= 1) { onExit(); return; }
       const prevFloor = currentFloor - 1;
-      const prevMap = CAVE_FLOORS[prevFloor];
+      const prevMap = dungeonFloors?.[prevFloor];
       if (!prevMap) return;
       let stair = { x: nx, y: ny };
       for (let y = 0; y < prevMap.length; y++) {
@@ -2537,7 +2739,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
 
     setIntPos({ x: nx, y: ny });
     setAnimStep((s) => s + 1);
-  }, [intPos, cols, rows, map, npcByPos, triggerEvent, onExit, isCave, currentFloor]);
+  }, [intPos, cols, rows, map, npcByPos, triggerEvent, onExit, isDungeon, currentFloor, dungeonFloors, maxDungeonFloor]);
 
   const investigate = useCallback(() => {
     // ドラクエ的：机/カウンター越しに正面のNPCへ話しかけられるようにする
@@ -2606,6 +2808,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     if (!intEvent) return;
     const ev = intEvent;
     setIntEvent(null);
+    if (ev.enemyId && onEnemyBattle) { onEnemyBattle(ev.enemyId); return; }
     if (ev.boss && onBoss) { onBoss(); return; }
     if (ev.shop) {
       const itemsMap = { T2: SHOP_ITEMS_T2, T3: SHOP_ITEMS_T3 };
@@ -2614,17 +2817,33 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     }
   };
 
-  const TS = Math.max(20, Math.floor(336 / cols));
+  // ビューポート：大きなマップ（ダンジョン以外）はプレイヤー中心の 11×11 窓で表示
+  const INT_VIEW = 11;
+  const useViewport = !isDungeon && (rows > 13 || cols > 13);
+  const viewW = useViewport ? Math.min(cols, INT_VIEW) : cols;
+  const viewH = useViewport ? Math.min(rows, INT_VIEW) : rows;
+  const TS = Math.max(20, Math.floor(336 / viewW));
+  const camX = useViewport ? Math.max(0, Math.min(cols - viewW, intPos.x - Math.floor(viewW / 2))) : 0;
+  const camY = useViewport ? Math.max(0, Math.min(rows - viewH, intPos.y - Math.floor(viewH / 2))) : 0;
+  const renderCells = useViewport
+    ? Array.from({ length: viewH }, (_, vy) =>
+        Array.from({ length: viewW }, (_, vx) => {
+          const mx = camX + vx;
+          const my = camY + vy;
+          return { x: mx, y: my, tile: map[my]?.[mx] ?? INT.WALL };
+        })
+      )
+    : map.map((row, y) => row.map((tile, x) => ({ x, y, tile })));
   return (
-    <div className={`relative flex flex-col h-full ${isCave ? "bg-gray-950" : isUnderground ? "bg-stone-950" : "bg-black"} text-white px-2 py-3 gap-2`}>
-      <div className={`border p-2 text-xs text-center ${isCave ? "border-gray-800 text-gray-400" : isUnderground ? "border-stone-700 text-amber-600" : "border-gray-600 text-yellow-300"}`}>{title}</div>
+    <div className={`relative flex flex-col h-full ${isDungeon ? "bg-gray-950" : isUnderground ? "bg-stone-950" : "bg-black"} text-white px-2 py-3 gap-2`}>
+      <div className={`border p-2 text-xs text-center ${isDungeon ? "border-gray-800 text-gray-400" : isUnderground ? "border-stone-700 text-amber-600" : "border-gray-600 text-yellow-300"}`}>{title}</div>
       <div className="flex justify-center">
-        <div className="relative" style={{ width: cols * TS, height: rows * TS }}>
-        <div className="inline-grid gap-0" style={{ gridTemplateColumns: `repeat(${cols},${TS}px)`, border: `1px solid ${isCave ? "#222" : isUnderground ? "#1c1008" : "#444"}` }}>
-          {map.map((row, y) => row.map((tile, x) => {
+        <div className="relative" style={{ width: viewW * TS, height: viewH * TS }}>
+        <div className="inline-grid gap-0" style={{ gridTemplateColumns: `repeat(${viewW},${TS}px)`, border: `1px solid ${isCave ? "#222" : isUnderground ? "#1c1008" : "#444"}` }}>
+          {renderCells.map((row) => row.map(({ x, y, tile }) => {
             const isPlayer = intPos.x === x && intPos.y === y;
             const npc = npcByPos[`${y},${x}`];
-            const chestKey = isCave ? `${interiorType}:${currentFloor}:${y},${x}` : `${interiorType}:${y},${x}`;
+            const chestKey = isDungeon ? `${interiorType}:${currentFloor}:${y},${x}` : `${interiorType}:${y},${x}`;
             const chestOpened = openedChestSet.has(chestKey);
             const displayTile = tile === INT.NPC ? INT.FLOOR : tile;
             const key = `${y},${x}`;
@@ -2650,7 +2869,19 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
                       if (interiorType === "catVillage") {
                         return <CatNpcSprite furColor={p?.body ?? "#fca5a5"} markColor={p?.hair ?? "#7c2d12"} size={sz} />;
                       }
-                      return <NpcSprite bodyColor={p?.body ?? "#a3e635"} hairColor={p?.hair ?? "#1a0a00"} size={sz} />;
+                      if (interiorType === "town" && npc.eventKey === "26,6") {
+                        return <DogNpcSprite furColor={p?.body ?? "#c8834a"} earColor={p?.hair ?? "#7c2d12"} size={sz} />;
+                      }
+                      const role = interiorType === "castle"
+                        ? npc.eventKey === "4,10"
+                          ? "king"
+                          : npc.eventKey === "5,13"
+                            ? "princess"
+                            : npc.eventKey === "36,8" || npc.eventKey === "36,11" || npc.eventKey === "34,6" || npc.eventKey === "34,13"
+                              ? "guard"
+                              : "villager"
+                        : "villager";
+                      return <NpcSprite bodyColor={p?.body ?? "#a3e635"} hairColor={p?.hair ?? "#1a0a00"} size={sz} role={role} />;
                     })()
                     : tile === INT.CHEST
                       ? <InteriorTileIcon kind="chest" size={TS - 4} opened={chestOpened} />
@@ -2675,11 +2906,11 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
             );
           }))}
         </div>
-        {isCave && <CaveDarkness intPos={intPos} TS={TS} cols={cols} rows={rows} />}
+        {isDungeon && <CaveDarkness intPos={intPos} TS={TS} cols={cols} rows={rows} />}
         </div>
       </div>
       <p className="text-[10px] text-center text-gray-400">
-        {isCave ? "A/Enterで調べる（机越しOK） ／ 階段で階層移動" : "A/Enterで調べる（机越しOK） ／ 出口へ乗ると外へ"}
+        {isDungeon ? "A/Enterで調べる（机越しOK） ／ 階段で階層移動" : "A/Enterで調べる（机越しOK） ／ 出口へ乗ると外へ"}
       </p>
 
       <div className="mt-auto border-2 border-zinc-500 bg-zinc-800 rounded-md p-3 shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]">
@@ -2759,8 +2990,31 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
   const [fearDebuffTurns, setFearDebuffTurns] = useState(0);
   const [turnSerial, setTurnSerial] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [bossIntroDone, setBossIntroDone] = useState(!isBoss);
+  const [bossCharging, setBossCharging] = useState(false);
+  const [playerHitFlash, setPlayerHitFlash] = useState(false);
+  const [playerShakeX, setPlayerShakeX] = useState(0);
   const logRef = useRef(null);
   const prevFearRef = useRef(0);
+  const damageFxTimerRef = useRef(null);
+  const damageSfxCtxRef = useRef(null);
+  const storyPhase = getStoryPhase(player);
+  const availableSpells = useMemo(() => getUnlockedSpells(player), [player]);
+  const enemyRecommendedLevel = initEnemy?.recommendedLevel ?? getEnemyRecommendedLevel(initEnemy?.id);
+
+  useEffect(() => {
+    if (!isBoss) {
+      setBossIntroDone(true);
+      setBossCharging(false);
+      return;
+    }
+    setBossIntroDone(false);
+    setBossCharging(false);
+    addLog("洞窟の闇が　脈打つ……");
+    addLog("ドランゴの目が　赤く　光った！");
+    const t = setTimeout(() => setBossIntroDone(true), 1100);
+    return () => clearTimeout(t);
+  }, [isBoss]);
 
   // おそれレベル：HP比率から自動計算
   const fearLevel = useMemo(() => {
@@ -2774,6 +3028,54 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
 
   const addLog = (msg) => setLog(prev => [...prev.slice(-11), msg]);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
+
+  const triggerPlayerDamageFx = useCallback((damage = 1) => {
+    const power = clamp(Number(damage || 1), 1, 40);
+    setPlayerHitFlash(true);
+    setPlayerShakeX((Math.random() < 0.5 ? -1 : 1) * (power >= 16 ? 8 : power >= 9 ? 6 : 4));
+    if (damageFxTimerRef.current) clearTimeout(damageFxTimerRef.current);
+    damageFxTimerRef.current = setTimeout(() => {
+      setPlayerHitFlash(false);
+      setPlayerShakeX(0);
+    }, 130);
+
+    if (!damageSfxCtxRef.current) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) damageSfxCtxRef.current = new Ctx();
+    }
+    const ctx = damageSfxCtxRef.current;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+
+    // 低いノイズ感のある被弾音
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(240 + power * 2, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.055, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+
+    // 高域の一瞬アタック
+    const hitOsc = ctx.createOscillator();
+    const hitGain = ctx.createGain();
+    hitOsc.type = "square";
+    hitOsc.frequency.setValueAtTime(980, now);
+    hitOsc.frequency.exponentialRampToValueAtTime(320, now + 0.04);
+    hitGain.gain.setValueAtTime(0.0001, now);
+    hitGain.gain.exponentialRampToValueAtTime(0.035, now + 0.004);
+    hitGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    hitOsc.connect(hitGain);
+    hitGain.connect(ctx.destination);
+    hitOsc.start(now);
+    hitOsc.stop(now + 0.055);
+  }, []);
 
   // おそれレベルが上がったときにログ表示
   useEffect(() => {
@@ -2792,9 +3094,25 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       return curPHp;
     }
     if (sleeping) { addLog(`${enemy.name}は　ねむっている…`); setSleeping(false); return curPHp; }
+    if (isBoss && bossCharging) {
+      setBossCharging(false);
+      const burstBase = Math.max(1, Math.round((enemy.atk || 1) * 1.45));
+      const burstCap = Math.max(6, Math.floor(player.maxHp * 0.45));
+      const dmg = Math.min(burstCap, Math.max(1, burstBase - Math.floor(player.def / 3) + rng(-1, 2)));
+      const next = Math.max(0, curPHp - dmg);
+      addLog(`${enemy.name}の　終焉の波動！ ${player.name}に ${dmg}の　ダメージ！`);
+      setPHp(next);
+      triggerPlayerDamageFx(dmg);
+      return next;
+    }
     const mgPool = enemyMagics;
-    if (mgPool.length && rng(0, 2) === 0) {
+    const magicChance = Math.max(0.15, Math.min(0.5, (1 / 3) * (enemy.magicRateMult ?? (storyPhase === 1 ? 0.55 : storyPhase === 2 ? 0.85 : 1))));
+    if (mgPool.length && Math.random() < magicChance) {
       const mg = mgPool[rng(0, mgPool.length - 1)];
+      if (mg.transformFile) {
+        setEnemy((e) => ({ ...e, formImageFile: mg.transformFile, formLabel: mg.transformLabel || "" }));
+        addLog(`${enemy.name}の　身体が　${mg.transformLabel || "異形"}に　変わった！`);
+      }
       if (mg.type === "heal") {
         setEnemy(e => ({ ...e, curHp: Math.min(e.hp, e.curHp + mg.power) }));
         addLog(`${enemy.name}は　${mg.name}を　となえた！　HPが　かいふく！`);
@@ -2805,15 +3123,25 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
         addLog(`${player.name}の　こころに　やみが　宿る……（こうげき-3、3ターン）`);
         return curPHp;
       } else {
-        const dmg  = Math.max(1, mg.power - Math.floor(player.def / 3) + rng(-1, 2));
+        const raw = Math.max(1, mg.power - Math.floor(player.def / 3) + rng(-1, 2));
+        const cap = Math.max(4, Math.floor(player.maxHp * (isBoss ? 0.4 : 0.34)));
+        const dmg = Math.min(cap, raw);
         const next = Math.max(0, curPHp - dmg);
-        const verb = mg.name === "闇の吐息" ? "はいた" : "となえた";
+        const verb = mg.transformFile ? "はなった" : "となえた";
         addLog(`${enemy.name}は　${mg.name}を　${verb}！　${player.name}に ${dmg}の　ダメージ！`);
         setPHp(next);
+        triggerPlayerDamageFx(dmg);
         return next;
       }
     }
-    const dmg  = Math.max(1, enemy.atk - player.def + rng(-2, 2));
+    if (isBoss && !bossCharging && rng(1, 100) <= 22) {
+      setBossCharging(true);
+      addLog(`${enemy.name}は　闇を　集めている……！`);
+      return curPHp;
+    }
+    const raw = Math.max(1, enemy.atk - player.def + rng(-2, 2));
+    const cap = Math.max(4, Math.floor(player.maxHp * (isBoss ? 0.38 : 0.32)));
+    const dmg = Math.min(cap, raw);
     const next = Math.max(0, curPHp - dmg);
     addLog(`${enemy.name}の　こうげき！ ${player.name}に ${dmg}の　ダメージ！`);
     if (enemy.poison && Math.random() < (enemy.poisonRate ?? 0)) {
@@ -2822,24 +3150,30 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       addLog(`${player.name}は　どくに　おかされた！`);
     }
     setPHp(next);
+    triggerPlayerDamageFx(dmg);
     return next;
-  }, [enemy, player, sleeping, enemyMagics, onFlee]);
+  }, [enemy, player, sleeping, enemyMagics, onFlee, isBoss, bossCharging, storyPhase, triggerPlayerDamageFx]);
 
   useEffect(() => {
     if (turnSerial <= 0 || !poisoned || poisonTurns <= 0) return;
     const dmg = Math.max(1, Math.floor(player.maxHp * 0.06));
     setPHp((h) => Math.max(1, h - dmg));
     addLog(`どくの　ダメージ！ ${dmg}の　ダメージ！`);
+    triggerPlayerDamageFx(Math.max(1, Math.floor(dmg * 0.6)));
     const nextTurns = poisonTurns - 1;
     setPoisonTurns(nextTurns);
     if (nextTurns <= 0) {
       setPoisoned(false);
       addLog("どくが　きえた！");
     }
-  }, [turnSerial, poisoned, poisonTurns, player.maxHp]);
+  }, [turnSerial, poisoned, poisonTurns, player.maxHp, triggerPlayerDamageFx]);
+
+  useEffect(() => () => {
+    if (damageFxTimerRef.current) clearTimeout(damageFxTimerRef.current);
+  }, []);
 
   const attack = () => {
-    if (busy) return;
+    if (busy || !bossIntroDone) return;
     setBusy(true);
     const isCritical = rng(1, 100) <= 3;
     // おそれペナルティ
@@ -2856,26 +3190,26 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     setTimeout(() => setEnemyFlash(false), 90);
     setEnemy(e => ({ ...e, curHp: curEHp }));
     if (fearDebuffTurns > 0) setFearDebuffTurns(t => t - 1);
-    if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 320);
+    if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 220);
     // コウスケ援護（20%）
     if (hasCompanion && rng(1, 5) === 1) {
       const compDmg = rng(5, 10);
       curEHp = Math.max(0, curEHp - compDmg);
       addLog(`コウスケの　こころが　助けに来た！ ${compDmg}の　ダメージ！`);
       setEnemy(e => ({ ...e, curHp: curEHp }));
-      if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 320);
+      if (curEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp, pMp }); }, 220);
     }
     setTimeout(() => {
       const n = doEnemyTurn(pHp);
       setTurnSerial((t) => t + 1);
-      if (n <= 0) setTimeout(onLose, 520);
+      if (n <= 0) setTimeout(onLose, 380);
       setBusy(false);
-    }, 420);
+    }, 300);
   };
 
   const castSpell = (spell) => {
     if (pMp < spell.mp) return addLog("MPが　たりない！");
-    if (busy) return;
+    if (busy || !bossIntroDone) return;
     setBusy(true);
     let newPHp = pHp, newEHp = enemy.curHp;
     if (spell.effect === "heal") {
@@ -2887,12 +3221,20 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       const { damage, weak } = calcElementSpellDamage(spell, enemy);
       newEHp = Math.max(0, enemy.curHp - damage);
       setEnemy((e) => ({ ...e, curHp: newEHp }));
-      addLog(`${spell.name}！ ${enemy.name}に ${damage}の　ダメージ！${weak ? "　つよさばつぐん！" : ""}`);
+      addLog(`${spell.name}！ ${enemy.name}に ${damage}の　ダメージ！${weak ? "　強烈な一撃をお見舞いした！" : ""}`);
+      if (isBoss && bossCharging) {
+        setBossCharging(false);
+        addLog("闇の集束を　かき消した！");
+      }
     } else if (spell.effect === "wind") {
       const d = calcRawSpellDamage(spell.power, enemy);
       newEHp = Math.max(0, enemy.curHp - d);
       setEnemy((e) => ({ ...e, curHp: newEHp }));
       addLog(`${spell.name}！ ${enemy.name}に ${d}の　ダメージ！`);
+      if (isBoss && bossCharging) {
+        setBossCharging(false);
+        addLog("闇の集束を　吹き飛ばした！");
+      }
     } else if (spell.effect === "sleep") {
       if (enemy.id === 38) {
         addLog(`${spell.name}！　ドランゴには　きかなかった！`);
@@ -2903,26 +3245,26 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
     }
     setPMp((m) => m - spell.mp);
     setPhase("command");
-    if (newEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp: newPHp, pMp: pMp-spell.mp }); }, 320);
+    if (newEHp <= 0) return setTimeout(() => { setBusy(false); onWin({ exp: enemy.exp, gold: enemy.gold, pHp: newPHp, pMp: pMp-spell.mp }); }, 220);
     setTimeout(() => {
       const n = doEnemyTurn(newPHp);
       setTurnSerial((t) => t + 1);
-      if (n <= 0) setTimeout(onLose, 520);
+      if (n <= 0) setTimeout(onLose, 380);
       setBusy(false);
-    }, 420);
+    }, 300);
   };
 
   const flee = () => {
     if (isBoss) return addLog("ボスからは　にげられない！");
-    if (busy) return;
+    if (busy || !bossIntroDone) return;
     setBusy(true);
     if (rng(0,1)) { setBusy(false); onFlee(); }
     else {
       addLog("にげられなかった！");
       const n = doEnemyTurn(pHp);
       setTurnSerial((t) => t + 1);
-      if (n <= 0) setTimeout(onLose, 520);
-      setTimeout(() => setBusy(false), 220);
+      if (n <= 0) setTimeout(onLose, 380);
+      setTimeout(() => setBusy(false), 170);
     }
   };
 
@@ -2936,7 +3278,14 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
   const enemyPct = clamp(Math.round((enemy.curHp / enemy.hp) * 100), 0, 100);
 
   return (
-    <div className="flex flex-col h-full bg-black text-white p-3 gap-3">
+    <div
+      className="relative flex flex-col h-full bg-black text-white p-3 gap-3"
+      style={{
+        transform: `translateX(${playerShakeX}px)`,
+        transition: playerShakeX !== 0 ? "transform 40ms linear" : "transform 120ms ease-out",
+      }}
+    >
+      {playerHitFlash && <div className="absolute inset-0 z-10 pointer-events-none bg-red-500/15" />}
       <div className="border-2 border-gray-600 p-3 flex flex-col items-center gap-2">
         <div className={`${enemy.curHp < enemy.hp * 0.3 ? "opacity-60" : ""}`}
           style={{
@@ -2947,10 +3296,20 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
           <EnemySprite enemy={enemy} size={isBoss ? 108 : 84} flash={enemyFlash} />
         </div>
         <p className="text-sm font-bold">{enemy.name}</p>
+        {enemy.formLabel && <p className="text-[10px] text-fuchsia-300">{enemy.formLabel}</p>}
+        <p className="text-[10px] text-gray-300">推奨Lv {enemyRecommendedLevel}</p>
         <div className="w-full bg-gray-800 border border-gray-600 h-3 rounded overflow-hidden">
           <div className="bg-red-500 h-full transition-all duration-500" style={{ width:`${enemyPct}%` }} />
         </div>
       </div>
+      {isBoss && !bossIntroDone && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/85">
+          <div className="text-center">
+            <p className="text-red-300 text-lg tracking-widest animate-pulse">BOSS BATTLE</p>
+            <p className="text-yellow-200 text-xs mt-2">闇が揺れる……ドランゴが襲いかかる！</p>
+          </div>
+        </div>
+      )}
       <div className="border border-gray-700 p-2 grid grid-cols-1 gap-1">
         <HPBar label="HP" current={pHp} max={player.maxHp} />
         <HPBar label="MP" current={pMp} max={player.maxMp} color="blue" />
@@ -2958,6 +3317,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
         {fearLevel === 2 && <p className="text-[10px] text-red-400">状態：きょうふ（こうげき-4）</p>}
         {fearLevel === 1 && <p className="text-[10px] text-orange-300">状態：おびえ（こうげき-2）</p>}
         {fearDebuffTurns > 0 && <p className="text-[10px] text-red-300">やみのことば（こうげき-3、残{fearDebuffTurns}T）</p>}
+        {isBoss && bossCharging && <p className="text-[10px] text-yellow-300">ドランゴが　闇を集束中（次ターン大技）</p>}
         {hasCompanion && <p className="text-[10px] text-cyan-300">コウスケが　ともに　戦っている</p>}
       </div>
 
@@ -3001,7 +3361,10 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       {phase === "spell" && (
         <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-1">
           <p className="text-xs text-center text-blue-300">── じゅもんを　えらべ ──</p>
-          {SPELLS.filter(s => !s.secret || player.nazoSpellLearned).map(s => (
+          {availableSpells.length === 0 && (
+            <p className="text-xs text-center text-gray-500">まだ　おぼえた　じゅもんが　ない！</p>
+          )}
+          {availableSpells.map(s => (
             <button key={s.name} className={`border border-blue-600 py-2 text-xs flex justify-between px-4 ${pMp<s.mp?"opacity-40":""}`}
               disabled={busy || pMp < s.mp}
               onClick={() => castSpell(s)}>
@@ -3023,7 +3386,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
               className="border border-green-600 py-2 text-xs flex justify-between px-4"
               disabled={busy}
               onClick={() => {
-                if (busy) return;
+                if (busy || !bossIntroDone) return;
                 setBusy(true);
                 const healed = Math.min(player.maxHp - pHp, item.heal || 0);
                 const newPHp = pHp + healed;
@@ -3047,9 +3410,9 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
                 setTimeout(() => {
                   const n = doEnemyTurn(newPHp);
                   setTurnSerial((t) => t + 1);
-                  if(n<=0) setTimeout(onLose,520);
+                  if(n<=0) setTimeout(onLose,380);
                   setBusy(false);
-                }, 420);
+                }, 300);
               }}>
               <span className="text-green-300">{item.name} ×{item.count}</span>
               <span className="text-gray-400">{item.curePoison ? "どく回復" : `HP+${item.heal}`}</span>
@@ -3065,9 +3428,12 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
 function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
   const equip = player.equip ?? {};
   const eqName = (id) => id ? (EQUIP_DICT[id]?.name ?? id) : "なし";
+  const progress = getMainProgress(player);
+  const objective = getNextObjective(player);
   const WARP_POINTS = [
     { name: "はじまりの村", pos: SPECIAL_POS.village },
     { name: "いずみの街", pos: SPECIAL_POS.town },
+    { name: "職人の村", pos: SPECIAL_POS.artisanVillage },
     { name: "まなびの学校", pos: SPECIAL_POS.school },
     { name: "ながれぼしの家", pos: SPECIAL_POS.home },
   ];
@@ -3083,6 +3449,14 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
         <p>MP     ：{player.mp} / {player.maxMp}</p>
         <p>こうげき：{player.atk}　　まもり：{player.def}</p>
         <p>ゴールド：{player.gold}G</p>
+        <div className="border-t border-gray-700 mt-2 pt-2 space-y-1">
+          <p className="text-cyan-300">称号：{progress.title}</p>
+          <p className="text-cyan-200">進行率：{progress.percent}%（{progress.done}/{progress.total}）</p>
+          <div className="bg-gray-800 border border-gray-700 h-2 rounded overflow-hidden">
+            <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${progress.percent}%` }} />
+          </div>
+          <p className="text-[10px] text-gray-300">次の目的：{objective}</p>
+        </div>
         <div className="border-t border-gray-700 mt-2 pt-2 space-y-1">
           <p className="text-yellow-400">── そうび ──</p>
           <p>武器　：{eqName(equip.weapon)}</p>
@@ -3116,9 +3490,9 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
           </p>
         </div>
       </div>
-      {player.level >= 3 && (
+      {player.level >= 2 && (
         <div className="border border-blue-700 p-2">
-          <p className="text-xs text-blue-300 mb-2">── ルーラ ──</p>
+          <p className="text-xs text-blue-300 mb-2">── 旅のしるべ ──</p>
           {WARP_POINTS
             .filter((wp) => player.visited?.has(`${wp.pos.y},${wp.pos.x}`))
             .map((wp) => (
@@ -3127,7 +3501,7 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
                 className="block w-full border border-blue-600 text-blue-200 text-xs py-1 mb-1 active:opacity-60"
                 onClick={() => onWarp && onWarp(wp.pos)}
               >
-                {wp.name}へ　とぶ
+                {wp.name}へ　移動
               </button>
             ))}
         </div>
@@ -3153,20 +3527,101 @@ function GameOverScreen({ onRetry }) {
   );
 }
 
+// 固定の星配置（シード固定疑似乱数）
+const STARS = Array.from({ length: 60 }, (_, i) => {
+  const x = ((i * 7919 + 13) % 1000) / 1000;
+  const y = ((i * 6271 + 37) % 1000) / 1000;
+  const r = i % 3 === 0 ? 1.5 : 1.0;
+  return [x, y * 0.7, r];
+});
+
+function lerp(a, b, t) { return a + (b - a) * Math.min(1, Math.max(0, t)); }
+
+function DawnCanvas({ progress }) {
+  const canvasRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    // 空のグラデーション（夜 → 夜明け）
+    const r1 = Math.floor(lerp(0,  42, progress));
+    const g1 = Math.floor(lerp(0,  10, progress));
+    const b1 = Math.floor(lerp(16, 74, progress));
+    const skyTop = `rgb(${r1},${g1},${b1})`;
+
+    const r2 = Math.floor(lerp(0,  80, progress));
+    const g2 = Math.floor(lerp(0,  30, progress));
+    const b2 = Math.floor(lerp(20, 60, progress));
+    const skyBot = `rgb(${r2},${g2},${b2})`;
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, skyTop);
+    grad.addColorStop(1, skyBot);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 地平線のオレンジのグロー（progress後半から）
+    if (progress > 0.5) {
+      const glow = ctx.createRadialGradient(W/2, H*0.72, 0, W/2, H*0.72, H*0.4);
+      const alpha = Math.min(1, (progress - 0.5) * 2 * 0.5);
+      glow.addColorStop(0, `rgba(255,120,30,${alpha})`);
+      glow.addColorStop(1, "rgba(255,80,0,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 星（progressに応じてフェードアウト）
+    const starAlpha = Math.max(0, 1 - progress * 2);
+    if (starAlpha > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${starAlpha})`;
+      STARS.forEach(([sx, sy, sr]) => {
+        ctx.beginPath();
+        ctx.arc(sx * W, sy * H, sr, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  }, [progress]);
+
+  return (
+    <canvas ref={canvasRef} width={360} height={640}
+      style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.85 }} />
+  );
+}
+
 function EndingScreen({ player }) {
   const [shown, setShown] = useState(0);
+  const title = getPlayerTitle(player);
+  const hasSecretTitle = (player.storyFlags || []).includes("story:titleStarlight");
   const lines = [
     "ドランゴが　たおれた。",
+    "……静かだった。",
+    "ほんとうに　静かだった。",
     "暗かった空が　ゆっくりと　晴れていく。",
     "どこかで　子供の　笑い声が　聞こえた。",
-    "ライモンの　詩が　また　誰かに届く。",
-    "ミズキが　空を　見上げていた。",
-    "ネコが　にゃ、と言った。",
+    "———",
+    "ライモンは　ひとり、　詩を　書き始めた。",
+    "言葉が　また　動いた。　うたが　戻った。",
+    "———",
+    "ミズキが　窓を　開けた。",
+    "空が　青かった。",
+    "「……悪くない」と　小声で　言った。",
+    "———",
     "ヒロシの娘が　笑った。",
+    "ヒロシは　それを　見て　泣いた。",
+    "———",
+    "ネコが　にゃ、と言った。",
+    "ただそれだけだった。　でも　十分だった。",
+    "———",
     `そして　${player.name}は　草原に　立っていた。`,
     "……帰り方は　わからない。",
     "でも　今は　それでよかった。",
     "風が　吹いた。",
+    hasSecretTitle
+      ? `称号『${title}』が　夜明けの空に　輝いた。`
+      : `称号『${title}』を　胸に　あたらしい朝へ歩き出す。`,
   ];
   useEffect(() => {
     if (shown < lines.length - 1) {
@@ -3175,16 +3630,40 @@ function EndingScreen({ player }) {
     }
   }, [shown, lines.length]);
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-black text-white gap-6 px-6">
-      <p className="text-2xl animate-pulse tracking-widest">ENDING</p>
-      <div className="text-center space-y-2 px-4" style={{ fontFamily:"'Courier New',monospace" }}>
-        {lines.slice(0, shown + 1).map((l, i) => (
-          <p key={i} className={`text-sm leading-7 transition-opacity duration-700 ${i === shown ? "text-yellow-200" : "text-gray-400"}`}>{l}</p>
-        ))}
+    <div style={{ position:"relative", width:"100%", height:"100%", background:"#000010",
+                  display:"flex", flexDirection:"column", alignItems:"center",
+                  justifyContent:"center", overflow:"hidden" }}>
+
+      {/* 夜明けCanvas（背景） */}
+      <DawnCanvas progress={shown / Math.max(1, lines.length - 1)} />
+
+      {/* テキスト層（Canvas の上に重ねる） */}
+      <div style={{ position:"relative", zIndex:10, width:"100%",
+                    display:"flex", flexDirection:"column", alignItems:"center",
+                    gap:"1.5rem", padding:"0 1.5rem" }}>
+        <p style={{ fontSize:"1.5rem", letterSpacing:"0.25em",
+                    animation:"pulse 2s infinite",
+                    color: shown > lines.length * 0.7 ? "#fde68a" : "#ffffff" }}>
+          ENDING
+        </p>
+        <div style={{ textAlign:"center", fontFamily:"'Courier New',monospace" }}>
+          {lines.slice(0, shown + 1).map((l, i) => (
+            <p key={i} style={{
+              fontSize:"0.875rem", lineHeight:"1.75rem",
+              transition:"opacity 0.7s",
+              color: i === shown ? "#fde68a" : "rgba(209,213,219,0.6)"
+            }}>
+              {l === "———" ? <span style={{ color:"rgba(255,255,255,0.2)" }}>———</span> : l}
+            </p>
+          ))}
+        </div>
+        {shown >= lines.length - 1 && (
+          <p style={{ fontSize:"0.75rem", color:"rgba(156,163,175,0.6)",
+                      marginTop:"1rem", animation:"pulse 2s infinite" }}>
+            ～ THE END ～
+          </p>
+        )}
       </div>
-      {shown >= lines.length - 1 && (
-        <p className="text-xs text-gray-600 mt-4 animate-pulse">～ THE END ～</p>
-      )}
     </div>
   );
 }

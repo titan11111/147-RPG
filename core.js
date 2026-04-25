@@ -26,10 +26,15 @@ let GAME_DATA = typeof structuredClone === "function"
   : JSON.parse(JSON.stringify(DEFAULT_GAME_DATA));
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const MAP_SIZE = 50;
+const WORLD_SCALE = 1.5;
+const MAP_SIZE = Math.round(50 * WORLD_SCALE);
 const VIEW_SIZE = 9;
 const INT_COLS = 12;
 const INT_ROWS = 12;
+
+function scaleWorldCoord(value) {
+  return Math.max(1, Math.min(MAP_SIZE - 2, Math.round(value * WORLD_SCALE)));
+}
 
 const TILE = {
   GRASS: "grass", TOWN: "town", SCHOOL: "school", CAVE: "cave", HOME: "home",
@@ -97,32 +102,97 @@ const CAVE_INT_STYLE = {
   [INT.STAIRS_UP]: "#64748b",
 };
 
-const SPECIAL_POS = {
-  village:      { x: 23, y: 25 },   // dist= 2 Zone A（はじまりの村）
-  town:         { x: 19, y: 19 },   // dist=12 初心者ゾーン終盤
-  castle:       { x: 22, y: 16 },   // dist= ? 王城（重要拠点）
-  school:       { x: 35, y: 14 },   // dist=21 中堅ゾーン
-  home:         { x: 38, y: 38 },   // dist=26 上級ゾーン（回復地点）
-  cave:         { x: 42, y: 42 },   // dist=34 最終ゾーン（ボス）
-  manabiVillage:{ x:  2, y:  2 },   // dist=46 世界の端（まなびの村）
-  nazoVillage:  { x:  5, y: 45 },   // dist=40 謎の村（仙人マンたちの村）
-  catVillage:   { x: 46, y:  6 },   // dist=40 猫の村
-  onsen:        { x: 40, y: 36 },   // dist=30 雪原の露天温泉（地下への入口）
-  southShrine:  { x: 24, y: 40 },   // 南の祠（占い婆さん・道聞きリコーダー）
+const CASTLE_INT_STYLE = {
+  [INT.FLOOR]: "#3b0d13",
+  [INT.WALL]: "#25151b",
+  [INT.EXIT]: "#22c55e",
+  [INT.NPC]: "#3b0d13",
+  [INT.SHELF]: "#7f1d1d",
+  [INT.DESK]: "#7c2d12",
+  [INT.BOARD]: "#b91c1c",
+  [INT.COUNTER]: "#f59e0b",
+  [INT.FOUNTAIN]: "#60a5fa",
+  [INT.CHEST]: "#d4af37",
 };
+
+const VILLAGE_INT_STYLE = {
+  [INT.FLOOR]: "#8fbc8f",
+  [INT.WALL]: "#4a3a2a",
+  [INT.EXIT]: "#22c55e",
+  [INT.NPC]: "#8fbc8f",
+  [INT.SHELF]: "#7a4f2a",
+  [INT.DESK]: "#8b5a2b",
+  [INT.BOARD]: "#6b4f2f",
+  [INT.COUNTER]: "#9c6b3f",
+  [INT.FOUNTAIN]: "#38bdf8",
+  [INT.CHEST]: "#8b5a2b",
+};
+
+const TOWN_INT_STYLE = {
+  [INT.FLOOR]: "#9ca3af",
+  [INT.WALL]: "#374151",
+  [INT.EXIT]: "#22c55e",
+  [INT.NPC]: "#9ca3af",
+  [INT.SHELF]: "#6b7280",
+  [INT.DESK]: "#65a30d",
+  [INT.BOARD]: "#475569",
+  [INT.COUNTER]: "#64748b",
+  [INT.FOUNTAIN]: "#60a5fa",
+  [INT.CHEST]: "#a16207",
+};
+
+const SPECIAL_POS = {
+  village:       { x: scaleWorldCoord(23), y: scaleWorldCoord(25) }, // Zone A（はじまりの村）
+  town:          { x: scaleWorldCoord(19), y: scaleWorldCoord(19) }, // 初心者ゾーン終盤
+  castle:        { x: scaleWorldCoord(22), y: scaleWorldCoord(16) }, // 王城（重要拠点）
+  artisanVillage:{ x: scaleWorldCoord(12), y: scaleWorldCoord(34) }, // 職人の村（サイド拠点）
+  school:        { x: scaleWorldCoord(35), y: scaleWorldCoord(14) }, // 中堅ゾーン
+  home:          { x: scaleWorldCoord(38), y: scaleWorldCoord(38) }, // 上級ゾーン（回復地点）
+  cave:          { x: scaleWorldCoord(42), y: scaleWorldCoord(42) }, // 最終ゾーン（ボス）
+  catCave:       { x: scaleWorldCoord(43), y: scaleWorldCoord(9) },  // 猫又の洞窟（猫の村近く）
+  manabiVillage: { x: scaleWorldCoord(2), y: scaleWorldCoord(2) },   // 世界の端（まなびの村）
+  nazoVillage:   { x: scaleWorldCoord(5), y: scaleWorldCoord(45) },  // 謎の村（仙人マンたちの村）
+  catVillage:    { x: scaleWorldCoord(46), y: scaleWorldCoord(6) },  // 猫の村
+  onsen:         { x: scaleWorldCoord(40), y: scaleWorldCoord(36) }, // 雪原の露天温泉（地下への入口）
+  southShrine:   { x: scaleWorldCoord(24), y: scaleWorldCoord(40) }, // 南の祠（占い婆さん・道聞きリコーダー）
+  shipyard:      { x: scaleWorldCoord(27), y: scaleWorldCoord(30) }, // 船入手イベント
+  airDock:       { x: scaleWorldCoord(45), y: scaleWorldCoord(32) }, // 飛行船入手イベント
+};
+
+const SAVE_POINT_POS = [
+  { x: scaleWorldCoord(23), y: scaleWorldCoord(27), name: "村の南の碑", messages: [
+    "旅人の足跡が刻まれた　古い石碑。",
+    "王の紋章が　静かに　輝いている……",
+    "ここまでの旅が　刻まれた！",
+  ]},
+  { x: scaleWorldCoord(22), y: scaleWorldCoord(18), name: "王城の碑", messages: [
+    "王城の近くに立つ　守護の碑。",
+    "剣と盾の紋章が　刻まれている。",
+    "ここまでの旅が　刻まれた！",
+  ]},
+  { x: scaleWorldCoord(29), y: scaleWorldCoord(25), name: "まよい道の碑", messages: [
+    "旅の分かれ道に立つ　道標の碑。",
+    "「道に迷ったとき　足跡を振り返れ」と　刻まれている。",
+    "ここまでの旅が　刻まれた！",
+  ]},
+];
 
 const WORLD_MARKERS = {
   [`${SPECIAL_POS.village.y},${SPECIAL_POS.village.x}`]: "village",
   [`${SPECIAL_POS.town.y},${SPECIAL_POS.town.x}`]: "castleTown",
   [`${SPECIAL_POS.castle.y},${SPECIAL_POS.castle.x}`]: "castleTown",
+  [`${SPECIAL_POS.artisanVillage.y},${SPECIAL_POS.artisanVillage.x}`]: "village",
   [`${SPECIAL_POS.school.y},${SPECIAL_POS.school.x}`]: "school",
   [`${SPECIAL_POS.home.y},${SPECIAL_POS.home.x}`]: "home",
   [`${SPECIAL_POS.cave.y},${SPECIAL_POS.cave.x}`]: "cave",
+  [`${SPECIAL_POS.catCave.y},${SPECIAL_POS.catCave.x}`]: "cave",
   [`${SPECIAL_POS.manabiVillage.y},${SPECIAL_POS.manabiVillage.x}`]: "village",
   [`${SPECIAL_POS.nazoVillage.y},${SPECIAL_POS.nazoVillage.x}`]: "mysticVillage",
   [`${SPECIAL_POS.catVillage.y},${SPECIAL_POS.catVillage.x}`]: "catVillage",
   [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: "onsen",
   [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: "village",
+  [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]: "village",
+  [`${SPECIAL_POS.airDock.y},${SPECIAL_POS.airDock.x}`]: "village",
 };
 
 function getWorldLandmarkType(tile, x, y) {
@@ -136,6 +206,22 @@ function getWorldLandmarkType(tile, x, y) {
   return "";
 }
 
+function createSeededRandom(seedText) {
+  let hash = 2166136261;
+  for (let i = 0; i < seedText.length; i++) {
+    hash ^= seedText.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  let state = hash >>> 0;
+  return function seededRandom() {
+    state += 0x6D2B79F5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const SCREEN = {
   TITLE: "title", NAME: "name", GENDER: "gender", PROLOGUE: "prologue",
   MAP: "map", INTERIOR: "interior", EVENT: "event", BATTLE: "battle",
@@ -146,6 +232,117 @@ function getEncounterCounter() {
   const min = GAME_DATA.encounter?.min ?? 12;
   const variance = GAME_DATA.encounter?.variance ?? 14;
   return min + Math.floor(Math.random() * variance);
+}
+
+function getStoryPhase(player) {
+  if (!player) return 1;
+  const flags = player.storyFlags || [];
+  const hasRoyalQuest = flags.includes("story:royalQuest");
+  const hasAllKeys = hasBagItem(player, "manabi_proof")
+    && hasBagItem(player, "ancient_key")
+    && hasBagItem(player, "dragon_scale");
+  if (!hasRoyalQuest) return 1;      // 序盤（0〜8分）
+  if (!hasAllKeys) return 2;         // 中盤前（8〜18分）
+  return 3;                          // 中盤後（18〜26分）
+}
+
+function getEncounterCounterForPlayer(player) {
+  const phase = getStoryPhase(player);
+  if (phase === 1) return 14 + Math.floor(Math.random() * 17); // 14-30
+  if (phase === 2) return 12 + Math.floor(Math.random() * 15); // 12-26
+  return 11 + Math.floor(Math.random() * 13); // 11-23
+}
+
+function getPlayerCombatIndex(player) {
+  if (!player) return 1;
+  const level = Math.max(1, Number(player.level || 1));
+  const atk = Math.max(1, Number(player.atk || 1));
+  const def = Math.max(0, Number(player.def || 0));
+  const learned = getUnlockedSpells(player);
+  const offensiveSpellCount = learned.filter((s) => ["elem", "wind"].includes(s.effect)).length;
+  const healSpellCount = learned.filter((s) => s.effect === "heal").length;
+  // atk/def は装備込みなので、武器防具の成長も自然に反映される
+  const base = level * 1.5 + atk * 0.8 + def * 0.65;
+  const spellBonus = offensiveSpellCount * 1.3 + healSpellCount * 0.4;
+  return base + spellBonus;
+}
+
+function getExpectedCombatIndexForEnemy(recLv) {
+  const lv = Math.max(1, Number(recLv || 1));
+  // レベル相応の想定戦力。終盤ほど1レベル差の影響をやや大きくする。
+  return lv * 2.6 + (lv >= 8 ? (lv - 7) * 0.5 : 0);
+}
+
+function tuneEnemyForPhase(enemy, player, options = {}) {
+  if (!enemy) return enemy;
+  const tuned = deepClone(enemy);
+  const isBoss = !!options.isBoss || tuned.id === 38;
+  const phase = getStoryPhase(player);
+
+  const recLv = getEnemyRecommendedLevel(tuned.id);
+  const playerLv = Math.max(1, Number(player?.level || 1));
+  const levelGap = playerLv - recLv;
+  // 推奨レベル差による微調整（レベル依存を弱く保つため変化量は小さめ）
+  const levelScale = levelGap <= -3 ? 1.06 : levelGap >= 4 ? 0.94 : 1.0;
+
+  if (isBoss) {
+    tuned.hp = Math.round((tuned.hp || 0) * 0.92);
+    tuned.atk = Math.round((tuned.atk || 0) * 0.95);
+    tuned.def = Math.round((tuned.def || 0) * 0.95);
+    tuned.hp = Math.round(tuned.hp * levelScale);
+    tuned.atk = Math.round(tuned.atk * levelScale);
+    tuned.def = Math.round(tuned.def * levelScale);
+    tuned.recommendedLevel = recLv;
+    return tuned;
+  }
+
+  if (phase === 1) {
+    // 序盤でもワンパン化しにくいよう、耐久を厚めに保つ
+    tuned.hp = Math.max(8, Math.round((tuned.hp || 0) * 1.18));
+    tuned.atk = Math.max(1, Math.round((tuned.atk || 0) * 0.92));
+    tuned.def = Math.max(1, Math.round((tuned.def || 0) * 1.20));
+    if (tuned.poisonRate != null) tuned.poisonRate = Math.min(0.16, tuned.poisonRate);
+    tuned.magicRateMult = 0.55;
+  } else if (phase === 2) {
+    tuned.hp = Math.max(10, Math.round((tuned.hp || 0) * 1.12));
+    tuned.atk = Math.max(1, Math.round((tuned.atk || 0) * 0.98));
+    tuned.def = Math.max(1, Math.round((tuned.def || 0) * 1.10));
+    if (tuned.poisonRate != null) tuned.poisonRate = Math.min(0.22, tuned.poisonRate);
+    tuned.magicRateMult = 0.85;
+  } else {
+    // 終盤は火力だけでなく耐久も伸ばし、短期決着になりすぎないようにする
+    tuned.hp = Math.max(14, Math.round((tuned.hp || 0) * 1.08));
+    tuned.atk = Math.max(1, Math.round((tuned.atk || 0) * 1.05));
+    tuned.def = Math.max(2, Math.round((tuned.def || 0) * 1.08));
+    if (tuned.poisonRate != null) tuned.poisonRate = Math.min(0.28, tuned.poisonRate);
+    tuned.magicRateMult = 1.0;
+  }
+
+  tuned.hp = Math.max(3, Math.round(tuned.hp * levelScale));
+  tuned.atk = Math.max(1, Math.round(tuned.atk * levelScale));
+  tuned.def = Math.max(0, Math.round(tuned.def * levelScale));
+
+  // レベル・装備・呪文習得をまとめた実戦力差で全敵を微調整
+  const playerCombat = getPlayerCombatIndex(player);
+  const expectedCombat = getExpectedCombatIndexForEnemy(recLv);
+  const combatGap = playerCombat - expectedCombat;
+  const cappedGap = clamp(combatGap, -8, 12);
+  const hpScaleByGap = 1 + cappedGap * 0.035;   // 最大 +42%
+  const atkScaleByGap = 1 + cappedGap * 0.018;  // 最大 +21.6%
+  const defScaleByGap = 1 + cappedGap * 0.026;  // 最大 +31.2%
+  tuned.hp = Math.max(3, Math.round(tuned.hp * hpScaleByGap));
+  tuned.atk = Math.max(1, Math.round(tuned.atk * atkScaleByGap));
+  tuned.def = Math.max(0, Math.round(tuned.def * defScaleByGap));
+
+  // 推奨レベル帯ごとの下限値を持たせて、どのエリアでも最低限の手応えを維持
+  const minHpByRecLv = recLv <= 2 ? 14 : recLv <= 4 ? 20 : recLv <= 7 ? 30 : recLv <= 10 ? 44 : 60;
+  const minDefByRecLv = recLv <= 2 ? 2 : recLv <= 4 ? 2 : recLv <= 7 ? 4 : recLv <= 10 ? 6 : 8;
+  tuned.hp = Math.max(minHpByRecLv, tuned.hp);
+  tuned.def = Math.max(minDefByRecLv, tuned.def);
+  tuned.exp = Math.max(1, Math.round((tuned.exp || 1) * (phase >= 3 ? 1.05 : 1)));
+  tuned.gold = Math.max(1, Math.round((tuned.gold || 1) * (phase >= 3 ? 1.05 : 1)));
+  tuned.recommendedLevel = recLv;
+  return tuned;
 }
 
 async function bootstrapRuntimeAssets() {
@@ -244,21 +441,33 @@ const ITEMS = {
 // key = "row,col" (マップ座標) → body/hair カラー
 const NPC_PALETTE = {
   village: {
-    "3,2":   { body:"#34d399", hair:"#065f46" }, // 宿屋主人
-    "3,11":  { body:"#60a5fa", hair:"#1e3a8a" }, // 道具屋店主
-    "10,2":  { body:"#fbbf24", hair:"#92400e" }, // 子ども
-    "10,10": { body:"#a78bfa", hair:"#ede9fe" }, // みちびきの老人
+    "2,20":  { body:"#ddd6fe", hair:"#4338ca" }, // 隠し語り部
+    "6,4":   { body:"#34d399", hair:"#065f46" }, // 宿屋主人
+    "6,18":  { body:"#60a5fa", hair:"#1e3a8a" }, // 道具屋店主
+    "17,5":  { body:"#fbbf24", hair:"#92400e" }, // 子ども
+    "15,12": { body:"#f9a8d4", hair:"#9d174d" }, // おしゃべり女性A
+    "17,17": { body:"#a78bfa", hair:"#ede9fe" }, // みちびきの老人
+    "18,15": { body:"#fda4af", hair:"#7f1d1d" }, // おしゃべり女性B
   },
   town: {
-    "2,3": { body:"#78716c", hair:"#1a0a00" }, // ゴラン（武器屋・無骨）
-    "2,6": { body:"#0ea5e9", hair:"#c8834a" }, // カモメ（旅商人・海色）
-    "5,2": { body:"#6b7280", hair:"#d1d5db" }, // ライモン（元詩人・白髪）
-    "5,13": { body:"#374151", hair:"#111827" }, // ミズキ（内向き・暗色）
-    "9,4": { body:"#f97316", hair:"#fbbf24" }, // ネコ（オレンジ猫）
-    "9,11": { body:"#b45309", hair:"#1a0a00" }, // ヒロシ（ガサツな男・土色）
-    "13,3": { body:"#c8834a", hair:"#f59e0b" }, // イヌ（茶色の犬）
-    "13,12": { body:"#e879f9", hair:"#831843" }, // ルナ（パリビ・紫ドレス）
-    "11,8": { body:"#fca5a5", hair:"#7c2d12" }, // 宿屋女将
+    "5,6": { body:"#78716c", hair:"#1a0a00" }, // ゴラン（武器屋・無骨）
+    "5,10": { body:"#0ea5e9", hair:"#c8834a" }, // カモメ（旅商人・海色）
+    "12,5": { body:"#6b7280", hair:"#d1d5db" }, // ライモン（元詩人・白髪）
+    "12,29": { body:"#374151", hair:"#111827" }, // ミズキ（内向き・暗色）
+    "17,9": { body:"#f97316", hair:"#fbbf24" }, // 情報屋（軽装の青年）
+    "17,26": { body:"#b45309", hair:"#1a0a00" }, // ヒロシ（ガサツな男・土色）
+    "26,6": { body:"#c8834a", hair:"#f59e0b" }, // イヌ（茶色の犬）
+    "26,29": { body:"#e879f9", hair:"#831843" }, // ルナ（パリビ・紫ドレス）
+    "22,18": { body:"#fca5a5", hair:"#7c2d12" }, // 宿屋女将
+    "16,18": { body:"#93c5fd", hair:"#7c3aed" }, // 変な人（井戸の住人）
+  },
+  artisanVillage: {
+    "2,3":  { body:"#f97316", hair:"#431407" }, // 鍛冶職人
+    "2,9":  { body:"#60a5fa", hair:"#1e3a8a" }, // 木工職人
+    "6,3":  { body:"#34d399", hair:"#065f46" }, // 染織職人
+    "6,14": { body:"#facc15", hair:"#713f12" }, // ガラス職人
+    "9,8":  { body:"#f472b6", hair:"#831843" }, // 装飾職人
+    "11,7": { body:"#a78bfa", hair:"#4c1d95" }, // 時計職人
   },
   school: {
     "2,2": { body:"#1d4ed8", hair:"#1a0a00" }, // ミナミ先生
@@ -270,8 +479,17 @@ const NPC_PALETTE = {
     "9,2": { body:"#7f1d1d", hair:"#1a0a00" }, // ぼろぼろの冒険者
     "1,5": { body:"#1a0a2a", hair:"#0a0015" }, // 謎の存在（ボス）
   },
+  catCave: {
+    "2,8": { body:"#f97316", hair:"#7c2d12" }, // 猫又
+  },
   castle: {
-    "8,8": { body:"#6b7280", hair:"#1f2937" }, // 衛兵（グレー）
+    "4,10": { body:"#fde047", hair:"#7c2d12" }, // 王（y=4, x=10）
+    "5,13": { body:"#f9a8d4", hair:"#7c2d12" }, // 姫（y=5, x=13）
+    "5,8":  { body:"#94a3b8", hair:"#334155" }, // 大臣（y=5, x=8）
+    "36,8": { body:"#64748b", hair:"#1e293b" }, // 城門衛兵（左）（y=36, x=8）
+    "36,11":{ body:"#64748b", hair:"#1e293b" }, // 城門衛兵（右）（y=36, x=11）
+    "34,6": { body:"#475569", hair:"#0f172a" }, // 城門見張り（左）（y=34, x=6）
+    "34,13":{ body:"#475569", hair:"#0f172a" }, // 城門見張り（右）（y=34, x=13）
   },
   manabiVillage: {
     "2,2":  { body:"#c084fc", hair:"#581c87" }, // 国語先生（紫・文学）
@@ -308,12 +526,13 @@ const NPC_PALETTE = {
 
 // ─── MAP GENERATION ───────────────────────────────────────────────────────────
 function generateMapGrid() {
+  const rand = createSeededRandom("147-RPG-WORLD-V3");
   const tiles   = [TILE.GRASS, TILE.FOREST, TILE.WATER, TILE.MOUNTAIN, TILE.SEA, TILE.LAKE, TILE.DESERT];
   const weights = [30, 18, 10, 12, 10, 8, 12];
   const total   = weights.reduce((a, b) => a + b, 0);
 
   const pickTile = () => {
-    let roll = Math.random() * total;
+    let roll = rand() * total;
     for (let i = 0; i < tiles.length; i++) { roll -= weights[i]; if (roll <= 0) return tiles[i]; }
     return TILE.GRASS;
   };
@@ -340,27 +559,60 @@ function generateMapGrid() {
   grid = smoothOnce(grid);
   grid = smoothOnce(grid);
 
-  for (let x = 2; x < MAP_SIZE - 2; x += 8) {
-    const oy = Math.floor(Math.random() * 17) - 8;
-    const y  = Math.max(1, Math.min(MAP_SIZE - 2, Math.floor(MAP_SIZE / 2) + oy));
-    grid[y][x] = TILE.BRIDGE;
-    if (grid[y][x-1] === TILE.GRASS) grid[y][x-1] = TILE.WATER;
-    if (grid[y][x+1] === TILE.GRASS) grid[y][x+1] = TILE.WATER;
+  // ワールド骨格: 大河・海峡・山脈を先に描いて進行を分割する
+  const riverBaseX = Math.floor(MAP_SIZE * 0.33);
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    const cx = riverBaseX + Math.round(Math.sin(y / 7) * 2);
+    for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx;
+      if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.WATER;
+    }
+    if (y % 16 === 8) grid[y][cx] = TILE.BRIDGE;
+  }
+
+  const seaBaseX = Math.floor(MAP_SIZE * 0.56);
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    const cx = seaBaseX + Math.round(Math.sin(y / 9) * 2);
+    for (let dx = -2; dx <= 2; dx++) {
+      const x = cx + dx;
+      if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.SEA;
+    }
+  }
+
+  const ridgeBaseY = Math.floor(MAP_SIZE * 0.66);
+  for (let x = 1; x < MAP_SIZE - 1; x++) {
+    const cy = ridgeBaseY + Math.round(Math.sin(x / 8) * 2);
+    for (let dy = -1; dy <= 1; dy++) {
+      const y = cy + dy;
+      if (y > 0 && y < MAP_SIZE - 1) grid[y][x] = TILE.MOUNTAIN;
+    }
+  }
+
+  // ラップ移動で抜け道にならないように外周は海へ
+  for (let i = 0; i < MAP_SIZE; i++) {
+    grid[0][i] = TILE.SEA;
+    grid[MAP_SIZE - 1][i] = TILE.SEA;
+    grid[i][0] = TILE.SEA;
+    grid[i][MAP_SIZE - 1] = TILE.SEA;
   }
 
   grid[Math.floor(MAP_SIZE/2)][Math.floor(MAP_SIZE/2)] = TILE.GRASS;
   grid[SPECIAL_POS.village.y][SPECIAL_POS.village.x]             = TILE.TOWN;
   grid[SPECIAL_POS.town.y][SPECIAL_POS.town.x]                   = TILE.TOWN;
   grid[SPECIAL_POS.castle.y][SPECIAL_POS.castle.x]               = TILE.TOWN;
+  grid[SPECIAL_POS.artisanVillage.y][SPECIAL_POS.artisanVillage.x] = TILE.TOWN;
   grid[SPECIAL_POS.school.y][SPECIAL_POS.school.x]               = TILE.SCHOOL;
   grid[SPECIAL_POS.home.y][SPECIAL_POS.home.x]                   = TILE.HOME;
   grid[SPECIAL_POS.cave.y][SPECIAL_POS.cave.x]                   = TILE.CAVE;
+  grid[SPECIAL_POS.catCave.y][SPECIAL_POS.catCave.x]             = TILE.CAVE;
   grid[SPECIAL_POS.manabiVillage.y][SPECIAL_POS.manabiVillage.x] = TILE.TOWN;
   grid[SPECIAL_POS.nazoVillage.y][SPECIAL_POS.nazoVillage.x]    = TILE.TOWN;
   grid[SPECIAL_POS.catVillage.y][SPECIAL_POS.catVillage.x]      = TILE.TOWN;
   grid[SPECIAL_POS.southShrine.y][SPECIAL_POS.southShrine.x]   = TILE.TOWN;
+  grid[SPECIAL_POS.shipyard.y][SPECIAL_POS.shipyard.x]         = TILE.TOWN;
+  grid[SPECIAL_POS.airDock.y][SPECIAL_POS.airDock.x]           = TILE.TOWN;
   // セーブポイント（雪ゾーン外に固定）
-  [[27,23],[18,22],[25,29]].forEach(([y,x]) => { grid[y][x] = TILE.GRASS; });
+  SAVE_POINT_POS.forEach(({ y, x }) => { grid[y][x] = TILE.GRASS; });
 
   // ─ 雪原生成（洞窟周辺をSNOWタイルで覆う）────────────────────────────────
   const FIXED_TILES = new Set([TILE.SEA, TILE.LAKE, TILE.WATER, TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE]);
@@ -369,11 +621,45 @@ function generateMapGrid() {
     for (let x = 0; x < MAP_SIZE; x++) {
       if (FIXED_TILES.has(grid[y][x])) continue;
       const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-      if (dist <= 13) grid[y][x] = TILE.SNOW;
-      else if (dist <= 20 && y > 26 && x > 28 && Math.random() < 0.50) grid[y][x] = TILE.SNOW;
+      if (dist <= Math.round(13 * WORLD_SCALE)) grid[y][x] = TILE.SNOW;
+      else if (dist <= Math.round(20 * WORLD_SCALE) && y > Math.round(26 * WORLD_SCALE) && x > Math.round(28 * WORLD_SCALE) && rand() < 0.50) grid[y][x] = TILE.SNOW;
     }
   }
   grid[SPECIAL_POS.onsen.y][SPECIAL_POS.onsen.x] = TILE.ONSEN;
+
+  // ─ 進行ゲートの強制配置 ───────────────────────────────────────────────────
+  const inBounds = (x, y) => x >= 1 && y >= 1 && x < MAP_SIZE - 1 && y < MAP_SIZE - 1;
+  const paintRing = (pos, radius, tile) => {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const x = pos.x + dx;
+        const y = pos.y + dy;
+        if (!inBounds(x, y)) continue;
+        // 重要地点の中心は上書きしない
+        if (x === pos.x && y === pos.y) continue;
+        if ([TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE, TILE.ONSEN].includes(grid[y][x])) continue;
+        grid[y][x] = tile;
+      }
+    }
+  };
+
+  // Area4: 船専用エリア（海で囲った島）
+  [SPECIAL_POS.manabiVillage, SPECIAL_POS.nazoVillage, SPECIAL_POS.catVillage].forEach((pos) => {
+    paintRing(pos, 1, TILE.SEA);
+    paintRing(pos, 2, TILE.SEA);
+  });
+
+  // Area5: 飛行船ドック（山脈の高台）
+  paintRing(SPECIAL_POS.airDock, 1, TILE.MOUNTAIN);
+  paintRing(SPECIAL_POS.airDock, 2, TILE.MOUNTAIN);
+  grid[SPECIAL_POS.airDock.y][SPECIAL_POS.airDock.x] = TILE.TOWN;
+
+  // Area6: 最終洞窟（山脈に囲まれ、飛行船でのみ到達）
+  paintRing(SPECIAL_POS.cave, 1, TILE.MOUNTAIN);
+  paintRing(SPECIAL_POS.cave, 2, TILE.MOUNTAIN);
+  paintRing(SPECIAL_POS.cave, 3, TILE.MOUNTAIN);
+  grid[SPECIAL_POS.cave.y][SPECIAL_POS.cave.x] = TILE.CAVE;
 
   return grid;
 }
@@ -427,9 +713,11 @@ const SIGN_MAP = (() => {
   const locs = [
     { pos: SPECIAL_POS.village,       name: 'はじまりの村' },
     { pos: SPECIAL_POS.town,          name: 'いずみの街' },
+    { pos: SPECIAL_POS.artisanVillage,name: '職人の村' },
     { pos: SPECIAL_POS.school,        name: 'まなびの学校' },
     { pos: SPECIAL_POS.home,          name: 'ながれぼしの家' },
     { pos: SPECIAL_POS.cave,          name: 'くらやみの洞窟' },
+    { pos: SPECIAL_POS.catCave,       name: '猫影の洞窟' },
     { pos: SPECIAL_POS.manabiVillage, name: 'まなびの村' },
     { pos: SPECIAL_POS.nazoVillage,   name: '謎の村' },
     { pos: SPECIAL_POS.catVillage,    name: '猫の村' },
@@ -474,26 +762,106 @@ function parseIntMap(rows) {
   return rows.map(r => r.split("").map(c => cm[c] ?? INT.FLOOR));
 }
 
-const TOWN_IMAP = parseIntMap([
-  "WWWWWWWWWWWWWWWWWW",
-  "W..CCCC..CCCC....W",  // 北区：露店エリア（左右に市場）
-  "W..N..N..........W",  // 通りに面した住民配置
-  "W..CCCC..CCCC....W",
-  "W.SSSS....SSSS...W",  // 生活区：棚のある建物
-  "W.N..D....D..N...W",  // 住民と机（家・仕事場）
-  "W......TTF.......W",  // 中央広場：宝箱2つ＋泉
-  "W................W",
-  "W...CCCCCCCC.....W",  // 南区：宿屋/道具屋の大カウンター
-  "W...N......N.....W",
-  "W...CCCCCCCC.....W",
-  "W.......N........W",  // 宿屋女将
-  "W................W",
-  "W..N........N....W",
-  "W................W",
-  "W........E.......W",
-  "W................W",
-  "WWWWWWWWWWWWWWWWWW",
-]);
+function buildTownRows() {
+  const width = 36;
+  const height = 34;
+  const rows = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) =>
+      x === 0 || y === 0 || x === width - 1 || y === height - 1 ? "W" : ".",
+    ),
+  );
+  const put = (x, y, ch) => {
+    if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) return;
+    rows[y][x] = ch;
+  };
+  const lineH = (x1, x2, y, ch) => { for (let x = x1; x <= x2; x++) put(x, y, ch); };
+  const lineV = (x, y1, y2, ch) => { for (let y = y1; y <= y2; y++) put(x, y, ch); };
+  const frame = (x1, y1, x2, y2, ch) => {
+    lineH(x1, x2, y1, ch); lineH(x1, x2, y2, ch); lineV(x1, y1, y2, ch); lineV(x2, y1, y2, ch);
+  };
+
+  // 北区マーケット（左右）
+  frame(2, 2, 13, 9, "W");
+  frame(22, 2, 33, 9, "W");
+  lineH(23, 32, 4, "C");
+  lineH(3, 12, 7, "S");
+  lineH(23, 32, 7, "S");
+  put(7, 9, ".");    // 左店ドア
+  put(28, 9, ".");   // 右店ドア
+
+  // 中央大通り
+  for (let y = 1; y <= 32; y++) {
+    put(17, y, ".");
+    put(18, y, ".");
+  }
+  // 街灯（中央通り）
+  [10, 20, 29].forEach((y) => {
+    put(16, y, "F");
+    put(19, y, "F");
+  });
+
+  // 井戸の広場（泉の街らしさ）
+  frame(14, 13, 21, 19, "W");
+  put(17, 16, "F");
+  put(18, 16, "F");
+  lineH(15, 20, 15, "C");
+  lineH(15, 20, 17, "C");
+  // 井戸まわりの花壇
+  put(15, 14, "D");
+  put(20, 14, "D");
+  put(15, 18, "D");
+  put(20, 18, "D");
+
+  // 西側住宅区
+  frame(2, 11, 12, 18, "W");
+  lineH(3, 11, 13, "B");
+  put(7, 18, ".");
+
+  // 東側住宅区
+  frame(23, 11, 33, 18, "W");
+  lineH(24, 32, 13, "B");
+  put(28, 18, ".");
+
+  // 南西: 畑エリア
+  frame(2, 21, 15, 30, "W");
+  lineH(4, 13, 23, "S");
+  lineH(4, 13, 25, "S");
+  lineH(4, 13, 27, "S");
+  lineH(4, 13, 29, "S");
+  put(8, 21, ".");
+
+  // 南東: 公園エリア（ベンチと噴水）
+  frame(20, 21, 33, 30, "W");
+  lineH(22, 31, 23, "B");
+  lineH(22, 31, 28, "B");
+  put(26, 26, "F");
+  put(27, 26, "F");
+  lineH(22, 31, 25, "D"); // 花壇
+  lineH(22, 31, 27, "D"); // 花壇
+  put(22, 22, "F");
+  put(31, 22, "F");
+  put(22, 29, "F");
+  put(31, 29, "F");
+  put(27, 21, ".");
+
+  // 住民と宝箱・出口
+  put(6, 5, "N");    // ゴラン
+  put(10, 5, "N");   // カモメ
+  put(5, 12, "N");   // ライモン
+  put(29, 12, "N");  // ミズキ
+  put(9, 17, "N");   // 情報屋
+  put(26, 17, "N");  // ヒロシ
+  put(18, 22, "N");  // 宿屋女将
+  put(6, 26, "N");   // イヌ
+  put(29, 26, "N");  // ルナ
+  put(18, 16, "N");  // 変な人（井戸の近く）
+  put(6, 24, "T");
+  put(28, 24, "T");
+  put(18, 32, "E");
+
+  return rows.map((row) => row.join(""));
+}
+const TOWN_IMAP = parseIntMap(buildTownRows());
 
 // 学校内部：奥へ抜けられる通路を確保（机で詰まらない設計）
 const SCHOOL_IMAP = parseIntMap([
@@ -512,23 +880,83 @@ const SCHOOL_IMAP = parseIntMap([
 ]);
 
 // ─── 王城マップ（重要拠点）────────────────────────────────────────────────────
-const CASTLE_IMAP = parseIntMap([
-  "WWWWWWWWWWWWWWWWWWWW",
-  "WBBBBBBBBBBBBBBBBBBW",
-  "W.....N......N.....W", // 兵士（左）/兵士（右）
-  "W..................W",
-  "W..CCCCCCCCCCCCCC..W", // 大広間の柵/カウンター風
-  "W..C............C..W",
-  "W..C....TTTT....C..W", // 宝箱（将来拡張用）
-  "W..C............C..W",
-  "W..CCCC.NC..CCCC...W",
-  "W.......N..........W", // 姫
-  "W..................W",
-  "W.....N............W", // 王
-  "W..................W",
-  "W........E.........W",
-  "WWWWWWWWWWWWWWWWWWWW",
-]);
+function buildCastleRows() {
+  const width = 20;
+  const height = 45; // 旧マップ比で縦を約3倍
+  const rows = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) =>
+      x === 0 || y === 0 || x === width - 1 || y === height - 1 ? "W" : ".",
+    ),
+  );
+  const put = (x, y, ch) => {
+    if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) return;
+    rows[y][x] = ch;
+  };
+  const lineH = (x1, x2, y, ch) => {
+    for (let x = x1; x <= x2; x++) put(x, y, ch);
+  };
+  const lineV = (x, y1, y2, ch) => {
+    for (let y = y1; y <= y2; y++) put(x, y, ch);
+  };
+  const frame = (x1, y1, x2, y2, ch) => {
+    lineH(x1, x2, y1, ch);
+    lineH(x1, x2, y2, ch);
+    lineV(x1, y1, y2, ch);
+    lineV(x2, y1, y2, ch);
+  };
+
+  // 城門まわり（手前）
+  frame(4, 33, 15, 41, "C");
+  frame(6, 35, 13, 39, "C");
+  lineV(9, 39, 41, "C");
+  lineV(10, 39, 41, "C");
+  lineV(11, 39, 41, "C");
+  put(10, 42, "E");
+
+  // 長い中央廊下（両脇は城ブロック）
+  lineV(6, 8, 38, "C");
+  lineV(13, 8, 38, "C");
+  lineH(7, 12, 8, "C");
+  lineH(7, 12, 38, "C");
+
+  // 松明（廊下沿い）
+  [10, 14, 18, 22, 26, 30, 34].forEach((y) => {
+    put(5, y, "F");
+    put(14, y, "F");
+  });
+
+  // 玉座前の謁見エリア（奥）
+  frame(4, 2, 15, 8, "C");
+  lineH(7, 12, 3, "B"); // 奥の飾り帯
+  lineH(7, 12, 7, "B");
+  put(10, 4, "N"); // 王（奥の中央）
+  put(13, 5, "N"); // 姫（王の右）
+  put(8, 5, "N");  // 大臣（王の近く）
+
+  // 城門の衛兵
+  put(8, 36, "N");
+  put(11, 36, "N");
+  put(6, 34, "N");
+  put(13, 34, "N");
+
+  // 中央導線を確保（入口→回廊→玉座）
+  for (let y = 4; y <= 42; y++) put(10, y, ".");
+  for (let y = 9; y <= 41; y++) {
+    put(9, y, rows[y][9] === "N" ? "N" : ".");
+    put(11, y, rows[y][11] === "N" ? "N" : ".");
+  }
+  put(10, 4, "N");
+  put(13, 5, "N");
+  put(8, 5, "N");
+  put(8, 36, "N");
+  put(11, 36, "N");
+  put(6, 34, "N");
+  put(13, 34, "N");
+  put(10, 42, "E"); // 中央通路ループで上書きされた出口を再配置
+
+  return rows.map((row) => row.join(""));
+}
+const CASTLE_IMAP = parseIntMap(buildCastleRows());
 
 // ─── 洞窟マップ ───────────────────────────────────────────────────────────────
 // 上に進むほど「奥」= 深部。S=岩, F=地下水脈, B=石碑, N=NPC
@@ -574,22 +1002,59 @@ const CAVE_FLOORS = {
 const CAVE_IMAP = CAVE_FLOORS[1];
 
 // ─── はじまりの村マップ ────────────────────────────────────────────────────────
-const VILLAGE_IMAP = parseIntMap([
-  "WWWWWWWWWWWWWW",
-  "W............W",
-  "W.CCCC..CCCC.W",  // 左:宿屋 右:武器防具屋
-  "W.N..C..C..N.W",  // [3,2]=宿屋主人 [3,11]=店主
-  "W.CCCC..CCCC.W",
-  "W....T..T....W",  // 宝箱2つ
-  "W............W",
-  "W....F.......W",  // 泉
-  "W............W",
-  "W.CCCC.......W",
-  "W.N..C....N..W",  // [10,2]=子ども [10,10]=みちびき老人
-  "W.CCCC.......W",
-  "W.....E......W",
-  "WWWWWWWWWWWWWW",
-]);
+function buildVillageRows() {
+  const width = 24;
+  const height = 24;
+  const rows = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) =>
+      x === 0 || y === 0 || x === width - 1 || y === height - 1 ? "W" : ".",
+    ),
+  );
+  const put = (x, y, ch) => {
+    if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) return;
+    rows[y][x] = ch;
+  };
+  const lineH = (x1, x2, y, ch) => { for (let x = x1; x <= x2; x++) put(x, y, ch); };
+  const lineV = (x, y1, y2, ch) => { for (let y = y1; y <= y2; y++) put(x, y, ch); };
+  const frame = (x1, y1, x2, y2, ch) => {
+    lineH(x1, x2, y1, ch); lineH(x1, x2, y2, ch); lineV(x1, y1, y2, ch); lineV(x2, y1, y2, ch);
+  };
+
+  // 左: 宿屋 / 右: 武器防具屋
+  frame(2, 3, 10, 9, "W");
+  frame(13, 3, 21, 9, "W");
+  lineH(3, 9, 5, "C");
+  lineH(14, 20, 5, "C");
+  lineH(3, 9, 7, "S");
+  lineH(14, 20, 7, "S");
+  put(6, 9, ".");
+  put(17, 9, ".");
+
+  // 南側の民家区画
+  frame(2, 14, 9, 20, "W");
+  frame(14, 14, 21, 20, "W");
+  put(5, 14, ".");
+  put(17, 14, ".");
+
+  // 中央の小川と広場
+  for (let x = 6; x <= 17; x++) put(x, 12, "F");
+  put(12, 11, "F");
+
+  // NPC・宝箱・出口
+  put(20, 2, "N");  // 隠し語り部
+  put(4, 6, "N");   // 宿屋主人
+  put(18, 6, "N");  // 店主
+  put(5, 17, "N");  // 子ども
+  put(12, 15, "N"); // おしゃべり女性A（通路側）
+  put(17, 17, "N"); // 老人
+  put(15, 18, "N"); // おしゃべり女性B（通路側）
+  put(8, 8, "T");
+  put(15, 8, "T");
+  put(11, 22, "E");
+
+  return rows.map((row) => row.join(""));
+}
+const VILLAGE_IMAP = parseIntMap(buildVillageRows());
 
 // ─── まなびの村マップ（世界の端、教科先生6人）────────────────────────────────
 const MANABI_VILLAGE_IMAP = parseIntMap([
@@ -659,6 +1124,56 @@ const CAT_VILLAGE_IMAP = parseIntMap([
   "WWWWWWWWWWWW",
 ]);
 
+// ─── 職人の村マップ（広めの工房街）──────────────────────────────────────────────
+const ARTISAN_VILLAGE_IMAP = parseIntMap([
+  "WWWWWWWWWWWWWWWWWWWW",
+  "W..CCCC....CCCC....W",
+  "W..N..C..N..C......W",
+  "W..CCCC....CCCC....W",
+  "W..................W",
+  "W.SSSS....SSSS.....W",
+  "W..N.....F....N....W",
+  "W..................W",
+  "W...CCCCCCCCC......W",
+  "W...C...N...C......W",
+  "W...CCCCCCCCC......W",
+  "W.......N..........W",
+  "W..........T.......W",
+  "W...............E..W",
+  "W..................W",
+  "WWWWWWWWWWWWWWWWWWWW",
+]);
+
+// ─── 猫影の洞窟（猫又の中ボス洞窟）────────────────────────────────────────────
+const CAT_CAVE_FLOORS = {
+  1: parseIntMap([
+    "WWWWWWWWWWWW",
+    "W....V.....W",
+    "W..........W",
+    "W..S...F...W",
+    "W..........W",
+    "WWWWW.WWWWWW",
+    "W..........W",
+    "W....T.....W",
+    "W..........W",
+    "W....E.....W",
+    "WWWWWWWWWWWW",
+  ]),
+  2: parseIntMap([
+    "WWWWWWWWWWWW",
+    "W....U.....W",
+    "W.....F....W",
+    "W..S...N...W",
+    "W..........W",
+    "W....TT....W",
+    "WWWWW.WWWWWW",
+    "W..........W",
+    "W....F.....W",
+    "WWWWWWWWWWWW",
+  ]),
+};
+const CAT_CAVE_IMAP = CAT_CAVE_FLOORS[1];
+
 // ─── 南の祠マップ ───────────────────────────────────────────────────────────────
 const SOUTH_SHRINE_IMAP = parseIntMap([
   "WWWWWWWWWWWW",  // row 0
@@ -677,6 +1192,8 @@ const SOUTH_SHRINE_IMAP = parseIntMap([
 const INTERIOR_MAPS = {
   village: VILLAGE_IMAP, town: TOWN_IMAP, school: SCHOOL_IMAP,
   castle: CASTLE_IMAP,
+  artisanVillage: ARTISAN_VILLAGE_IMAP,
+  catCave: CAT_CAVE_IMAP,
   cave: CAVE_IMAP, manabiVillage: MANABI_VILLAGE_IMAP, nazoVillage: NAZO_VILLAGE_IMAP,
   catVillage: CAT_VILLAGE_IMAP, underground: UNDERGROUND_IMAP,
   southShrine: SOUTH_SHRINE_IMAP,
@@ -733,6 +1250,31 @@ const CAVE_EVENTS_BY_FLOOR = {
   },
 };
 
+const CAT_CAVE_EVENTS_BY_FLOOR = {
+  1: {
+    "3,6": { messages: [
+      "湿った壁から　雫が落ちる音が　続いている。",
+      "ひんやりした空気で　体が　引き締まった。",
+      "HPが　4　回復した！",
+    ], heal: 4 },
+  },
+  2: {
+    "2,5": { messages: [
+      "青白い湧き水が　ゆらめいている。",
+      "ひとくち飲んで　気持ちが落ち着いた。",
+      "HPが　6　回復した！",
+    ], heal: 6 },
+    "3,7": { messages: [
+      "洞窟の陰で　猫又が　こちらを見ている……！",
+      "素早い爪が　ひらめいた！",
+    ], enemyId: 39, mood: "warn", fixedNpc: true },
+    "8,5": { messages: [
+      "天井から落ちる雫が　青く光っている。",
+      "HPが　2　回復した！",
+    ], heal: 2, mood: "hope" },
+  },
+};
+
 const CAVE_TREASURES_BY_FLOOR = {
   1: {
     "4,8": { id: "cave:1:4,8", itemId: "antidote", amount: 1, messages: ["宝箱を　あけた！", "どくけしハーブを　てにいれた！"] },
@@ -743,25 +1285,39 @@ const CAVE_TREASURES_BY_FLOOR = {
   3: {},
 };
 
+const CAT_CAVE_TREASURES_BY_FLOOR = {
+  1: {
+    "7,5": { id: "catCave:1:7,5", itemId: "potion", amount: 1, messages: ["苔むした宝箱を　あけた！", "いやしのしずくを　てにいれた！"] },
+  },
+  2: {
+    "5,4": { id: "catCave:2:5,4", gold: 22, messages: ["石の小箱を　あけた！", "22ゴールドを　てにいれた！"] },
+    "5,7": { id: "catCave:2:5,7", itemId: "antidote", amount: 1, messages: ["石の小箱を　あけた！", "どくけしハーブを　てにいれた！"] },
+  },
+};
+
 // key = "y,x"
 const INTERIOR_EVENTS = {
   // ─── はじまりの村 ────────────────────────────────────────────────────────────
   village: {
-    "3,2": { messages: [
+    "2,20": { messages: [
+      "フードの語り部：「……短い旅でも、心は動く。",
+      "この世界は　迷いを　越えた者に　だけ　やさしい。」",
+    ] },
+    "6,4": { messages: [
       "宿屋の主人：「いらっしゃい、旅人さん。",
       "ひと晩　休んでいくかい？",
       "ゆっくり休んで、HPとMPが　全回復した！",
     ], heal: 999, inn: true, fixedNpc: true },
-    "3,11": { messages: [
+    "6,18": { messages: [
       "道具屋の店主：「武器と防具、旅の基本だよ。",
       "カウンター越しに　気軽に見ていって！",
     ], shop: true, fixedNpc: true },
-    "7,5": { messages: [
+    "11,12": { messages: [
       "小さな泉が　ある。",
       "飲んでみると　体が　温かくなった。",
       "HPが　8　回復した！",
     ], heal: 8 },
-    "10,2": { messages: [
+    "17,5": { messages: [
       "子ども：「ねえ！　旅人さんって　強い？",
       "ドランゴって　どんな顔してるの？",
       "ぼくも　いつか　旅に　出るんだ！",
@@ -769,15 +1325,25 @@ const INTERIOR_EVENTS = {
       "きみを　見てたら　少し　勇気が　出てきた！",
       "HPが　3　回復した！",
     ], heal: 3, mood: "hope" },
-    "10,10": { messages: [
+    "15,12": { messages: [
+      "旅の女性：「あっ、勇者さんだ。",
+      "きょうの献立、パンにするか　おにぎりにするかで迷ってるの。」",
+      "「世界が大変でも　お腹はすくのよね〜。」",
+    ], mood: "hope" },
+    "17,17": { messages: [
       "みちびきの　おじいさん：「戻ってきたか。",
       "街道は　まだ危ない。焦らず　育っていけ。",
       "次は　東のいずみの街で　情報を集めるといいぞ。",
     ], mood: "warn" },
+    "18,15": { messages: [
+      "旅の女性：「さっきまで　ここに猫がいた気がするの。",
+      "……でも気のせいかも。たぶん風だったわ。」",
+      "「まあ　細かいことは　気にしないのが一番！」",
+    ] },
   },
   town: {
     // 武器屋 ゴラン（無口で無骨、でも本質を突く）
-    "2,3": { messages: [
+    "5,6": { messages: [
       "ゴラン（武器屋）：「……旅人か。",
       "おまえ　その装備じゃ　ドランゴには　勝てん。",
       "まあ　俺の店の武器を　買っていけ。",
@@ -785,15 +1351,15 @@ const INTERIOR_EVENTS = {
     ], shop: true, fixedNpc: true },
     // カウンターで話す = 武器屋として機能
     // カモメ（陽気な旅商人、情報屋）
-    "2,6": { messages: [
+    "5,10": { messages: [
       "カモメ（旅商人）：「よお旅人！　あんたも　ドランゴを　倒しに来たか？",
       "東の洞窟に　住んでるって噂だぜ。",
       "俺？　俺は戦わんよ。生きてる方が　商売になるからな！　ハハハ！",
       "でも……本当に　この世界を　救えるのは　あんたしかいない気がする。",
       "なんとなくな。直感だ。",
-    ], fixedNpc: true },
+    ] },
     // ライモン（山月記スタイル：かつては偉大だった詩人、今は落ちぶれ）
-    "5,2": { messages: [
+    "12,5": { messages: [
       "ライモン（老人）：「……詩人だった頃の私は　もっと　声が大きかった。",
       "ドランゴが　この世界を　支配してから……",
       "人々の　笑い声が　消えた。歌が　消えた。",
@@ -802,7 +1368,7 @@ const INTERIOR_EVENTS = {
       "行け。私には　もう　行けないが。",
     ], mood: "sad" },
     // ミズキ（太宰治スタイル：自己否定、でも深い優しさ）
-    "5,13": { messages: [
+    "12,29": { messages: [
       "ミズキ：「……。",
       "どうせ　僕には　何もできない。",
       "ドランゴを　倒す勇気なんて　ない。",
@@ -810,16 +1376,15 @@ const INTERIOR_EVENTS = {
       "あなたみたいな人が　いてくれるなら。",
       "少しだけ　この世界も　悪くないかと　思えてくる。",
     ], mood: "sad" },
-    // ネコ（謎めいた猫、核心を突く）
-    "9,4": { messages: [
-      "ネコ：「にゃ。",
-      "……洞窟の奥には　気をつけるにゃ。",
-      "ドランゴは　おそれを　食って　大きくなる。",
-      "おそれなければ　小さくなるにゃ。",
-      "……にゃ。",
+    // 路地の情報屋（警告役）
+    "17,9": { messages: [
+      "情報屋：「おっと、旅人さん。",
+      "洞窟の奥は　気をつけたほうがいい。",
+      "ドランゴは　おそれを　食って　大きくなるって噂だ。",
+      "逆に　おそれなければ　小さくなる……らしいぜ。」",
     ], mood: "warn" },
     // ヒロシ（ガサツだが義侠心がある）
-    "9,11": { messages: [
+    "17,26": { messages: [
       "ヒロシ（がっちり男）：「おう！　旅人か！",
       "俺も　ドランゴぶっ殺しに行こうとしたんだけどよ、",
       "なんか　足がもつれてコケてよ。恥ずかしくてよ。やめた。",
@@ -828,7 +1393,7 @@ const INTERIOR_EVENTS = {
       "……頼むな。本当に。",
     ], mood: "sad" },
     // イヌ（犬らしい全力さ、シンプルな応援）
-    "13,3": { messages: [
+    "26,6": { messages: [
       "イヌ：「わんわん！",
       "わん　わわん！",
       "……（しっぽを　ぶんぶん　振っている）",
@@ -836,18 +1401,58 @@ const INTERIOR_EVENTS = {
       "HPが　3　回復した！",
     ], heal: 3 },
     // ルナ（パリジェンヌ風、軽薄そうで実は鋭い）
-    "13,12": { messages: [
+    "26,29": { messages: [
       "ルナ（おしゃれな女）：「あら、旅人じゃないの。珍しいわ。",
       "ドランゴって　アクセサリーとか　持ってるのかしら。",
       "なんかキラキラしてそう。",
       "……冗談よ。でも本気でも　あるわ。",
       "世界が　暗くなると　おしゃれも　できないの。",
       "はやく　終わらせてきてよね。",
-    ]},
-    "11,8": { messages: [
+    ] },
+    "22,18": { messages: [
       "宿屋の女将：「旅人さん、顔色がわるいよ。",
       "うちで休んでいきな。HPとMPを　整えておいき！",
     ], heal: 999, inn: true, fixedNpc: true },
+    "16,18": { messages: [
+      "逆立ち学者：「やあ、わたしは　逆立ちでしか歩かない学者だ。",
+      "朝は井戸に向かって『今日は右回転！』と叫ぶと　運が上がるらしい。",
+      "根拠？　ない！　でも　けっこう当たるんだよね。」",
+    ], mood: "hope", fixedNpc: true },
+  },
+  artisanVillage: {
+    "2,3": { messages: [
+      "鍛冶職人ガンテツ：「刃は　振るう人間の心を映すんだ。",
+      "迷いがある日は　重く、覚悟の日は　軽い。",
+      "必要なら　ここの品を見ていきな。」",
+    ], shop: true, shopItems: "T2", fixedNpc: true },
+    "2,9": { messages: [
+      "木工職人ヤチヨ：「橋も机も　一本の木から始まるんだよ。",
+      "焦って削ると　すぐ割れる。",
+      "旅も　同じさ。急ぐ時ほど　手順を大事にね。」",
+    ], fixedNpc: true },
+    "6,3": { messages: [
+      "染織職人アサギ：「糸は弱く見えて、束ねると強いんだ。",
+      "仲間の言葉も　同じだよ。",
+      "ほどけた心を　ちゃんと結び直しておいで。」",
+    ], mood: "hope", fixedNpc: true },
+    "6,14": { messages: [
+      "ガラス職人トウカ：「熱と冷えの　境目でしか　美しい形は生まれない。",
+      "苦しい時期は　割れる前の　大事な時間さ。」",
+    ], fixedNpc: true },
+    "9,8": { messages: [
+      "装飾職人ルリ：「小さな飾りが　武具の気配を変えるの。",
+      "見た目を整えるって　心の向きも整えることなんだよ。」",
+      "HPが　6　回復した！",
+    ], heal: 6, mood: "hope", fixedNpc: true },
+    "11,7": { messages: [
+      "時計職人ジク：「時は止まらないが、刻み方は選べる。",
+      "君の30分は　君だけのものだ。大事に使いなさい。」",
+    ], fixedNpc: true },
+    "6,9": { messages: [
+      "工房街の　湧き水だ。",
+      "焼けた喉が　すっと落ち着いた。",
+      "HPが　10　回復した！",
+    ], heal: 10 },
   },
   cave: {
     // 最奥の謎の存在（ボス戦トリガー）
@@ -1110,37 +1715,45 @@ const INTERIOR_EVENTS = {
   },
   // ─── 王城（城の王・姫・兵士）───────────────────────────────────────────────
   castle: {
-    "8,8": {
-      guard: true,
-      mood: "warn",
-      blockMessages: [
-        "「止まれ！　王の謁見なき者は　この先へ進めぬ！」",
-        "「まず王にお会いになりますよう。」",
-      ],
-      passMessages: [
-        "「……紋章を確認した。通れ。」",
-      ],
-      passCondition: (player) => (player.storyFlags || []).includes("story:royalQuest"),
-      fixedNpc: true,
-    },
-    "2,6": { messages: [
-      "兵士：「王様は　奥の間に　いらっしゃる。",
-      "旅人よ、ここは　王城だ。",
-      "無礼は　するなよ。」",
+    "36,8": { messages: [
+      "城門衛兵：「王城アストリアへ　ようこそ。",
+      "この先は　王の間まで　まっすぐ続く　謁見回廊だ。」",
+      "「松明の火に導かれ、迷わず進むがよい。」",
     ], fixedNpc: true },
-    "2,13": { messages: [
-      "兵士：「姫様は　城の中を　見回っておられる。",
-      "……この国は　闇に　おびえている。」",
+    "36,11": { messages: [
+      "城門衛兵：「不審な者は　ここで食い止める。",
+      "だが　お前からは　戦う覚悟が　見える。」",
     ], fixedNpc: true },
-    "9,8": { messages: [
+    "34,6": { messages: [
+      "見張り兵：「城門は　最後の砦だ。",
+      "王に会うまで　気を抜くな。」",
+    ], fixedNpc: true },
+    "34,13": { messages: [
+      "見張り兵：「長い回廊の先に　玉座の間がある。",
+      "まっすぐ進めば　王の御前だ。」",
+    ], fixedNpc: true },
+    "5,13": { messages: [
       "姫：「……勇者よ。」",
       "「父である王が　あなたに　使命を　伝えたいと言っています。」",
-      "「王の間へ　お進みください。」",
+      "「どうか　玉座の前へ。」",
     ], heal: 3, fixedNpc: true },
-    "11,6": { messages: [
-      "王：「よく来た　勇者よ。」",
-      "「ドランゴが　封印の洞窟に　潜んでいる。」",
-      "「この国の　未来を　頼む。」",
+    "5,8": { messages: [
+      "大臣：「王は　この国の行く末を　案じておられる。",
+      "勇者殿、どうか　お力添えを。」",
+    ], fixedNpc: true },
+    "4,10": { messages: [
+      "……玉座の奥から、重厚な声が　響いた。",
+      "「……来たか。　待っておった。」",
+      "老いた王が　ゆっくりと立ち上がる。",
+      "その目には　深い憂いと——　かすかな希望が　ある。",
+      "「ドランゴは　東の封印の洞窟に　潜んでいる。」",
+      "「されど　あの闇に踏み込むには　3つのしるしが　必要じゃ。」",
+      "「ひとつ——　はての地に眠る　『まなびのあかし』。」",
+      "「ふたつ——　謎を解く者が持つ　『ふるびたかぎ』。」",
+      "「みっつ——　猫の血族が守る　『ドラゴンのウロコ』。」",
+      "「3つ揃いし者のみが　洞窟への道を　開けることができる。」",
+      "「…………頼む。　この国の　子らの笑い声を——　取り戻してくれ。」",
+      "王が深々と　頭を垂れた。",
       "王から　使命を　授かった！",
     ], flag: "story:royalQuest", fixedNpc: true },
   },
@@ -1166,12 +1779,15 @@ const INTERIOR_EVENTS = {
 
 const INTERIOR_TREASURES = {
   village: {
-    "5,5": { id: "village:5,5", itemId: "herb", amount: 1, messages: ["宝箱を　あけた！", "みどりのハーブを　てにいれた！"] },
-    "5,8": { id: "village:5,8", gold: 18, messages: ["宝箱を　あけた！", "18ゴールドを　てにいれた！"] },
+    "8,8": { id: "village:8,8", itemId: "herb", amount: 1, messages: ["宝箱を　あけた！", "みどりのハーブを　てにいれた！"] },
+    "8,15": { id: "village:8,15", gold: 18, messages: ["宝箱を　あけた！", "18ゴールドを　てにいれた！"] },
   },
   town: {
-    "6,7": { id: "town:6,7", itemId: "potion", amount: 1, messages: ["宝箱を　あけた！", "いやしのしずくを　てにいれた！"] },
-    "6,8": { id: "town:6,8", gold: 35, messages: ["宝箱を　あけた！", "35ゴールドを　てにいれた！"] },
+    "24,6": { id: "town:24,6", itemId: "potion", amount: 1, messages: ["畑わきの箱を　あけた！", "いやしのしずくを　てにいれた！"] },
+    "24,28": { id: "town:24,28", gold: 35, messages: ["公園ベンチの箱を　あけた！", "35ゴールドを　てにいれた！"] },
+  },
+  artisanVillage: {
+    "12,11": { id: "artisanVillage:12,11", itemId: "mega_potion", amount: 1, messages: ["職人箱を　あけた！", "げんきのエリクサを　てにいれた！"] },
   },
   underground: {
     "12,8": { id: "underground:12,8", itemId: "mega_potion", amount: 2, messages: ["石の宝箱を　あけた！", "げんきのエリクサ×2を　てにいれた！"] },
@@ -1228,6 +1844,16 @@ const LOCATION_EVENTS = {
     ],
     interior: "town",
   },
+  [`${SPECIAL_POS.artisanVillage.y},${SPECIAL_POS.artisanVillage.x}`]: {
+    name: "職人の村",
+    messages: [
+      "金属と木の香りが　風に混じる。",
+      "ここは　いろんな職人が　腕を磨く　工房の村。",
+      "叩く音、削る音、織る音が　重なっている。",
+      "職人の村へ　はいる……",
+    ],
+    interior: "artisanVillage",
+  },
   [`${SPECIAL_POS.castle.y},${SPECIAL_POS.castle.x}`]: {
     name: "王城アストリア",
     messages: [
@@ -1269,6 +1895,16 @@ const LOCATION_EVENTS = {
     ],
     interior: "cave",
   },
+  [`${SPECIAL_POS.catCave.y},${SPECIAL_POS.catCave.x}`]: {
+    name: "猫影の洞窟",
+    messages: [
+      "猫の村の裏手に　小さな洞窟が口を開けている。",
+      "中から　低い唸り声が　聞こえる……。",
+      "足元には　猫の足あとが　無数に残っていた。",
+      "猫影の洞窟へ　はいる……",
+    ],
+    interior: "catCave",
+  },
   [`${SPECIAL_POS.manabiVillage.y},${SPECIAL_POS.manabiVillage.x}`]: {
     name: "まなびの村",
     messages: [
@@ -1300,22 +1936,30 @@ const LOCATION_EVENTS = {
     ],
     interior: "catVillage",
   },
-  // ─── セーブポイント碑（3か所）────────────────────────────────────────────────
-  "27,23": { name:"村の南の碑", messages:[
-    "旅人の足跡が刻まれた　古い石碑。",
-    "王の紋章が　静かに　輝いている……",
-    "ここまでの旅が　刻まれた！",
-  ], save: true },
-  "18,22": { name:"王城の碑", messages:[
-    "王城の近くに立つ　守護の碑。",
-    "剣と盾の紋章が　刻まれている。",
-    "ここまでの旅が　刻まれた！",
-  ], save: true },
-  "25,29": { name:"まよい道の碑", messages:[
-    "旅の分かれ道に立つ　道標の碑。",
-    "「道に迷ったとき　足跡を振り返れ」と　刻まれている。",
-    "ここまでの旅が　刻まれた！",
-  ], save: true },
+  [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]: {
+    name: "海鳴りの船着き場",
+    messages: [
+      "木の桟橋に　潮の匂いが　しみついている。",
+      "船大工：「王命を受けた旅人さんだな。",
+      "この船を　託そう。海も川も　渡れるはずだ。」",
+      "船を　てにいれた！",
+      "海と川を　移動できるようになった！",
+    ],
+    rewardFlag: "story:shipUnlocked",
+    requireStoryFlag: "story:royalQuest",
+  },
+  [`${SPECIAL_POS.airDock.y},${SPECIAL_POS.airDock.x}`]: {
+    name: "風読みの飛行船ドック",
+    messages: [
+      "崖上のドックに　古い飛行船が眠っている。",
+      "整備士：「3つのあかしを　集めたのか。ならば空を託そう。」",
+      "飛行船を　てにいれた！",
+      "山脈も　海も　越えて進めるようになった！",
+    ],
+    rewardFlag: "story:airshipUnlocked",
+    requireStoryFlag: "story:shipUnlocked",
+    requireItems: ["manabi_proof", "ancient_key", "dragon_scale"],
+  },
   [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: {
     name: "南の祠",
     messages: [
@@ -1339,6 +1983,14 @@ const LOCATION_EVENTS = {
     interior: "underground",
   },
 };
+
+SAVE_POINT_POS.forEach((point) => {
+  LOCATION_EVENTS[`${point.y},${point.x}`] = {
+    name: point.name,
+    messages: point.messages,
+    save: true,
+  };
+});
 
 // ─── ENEMIES ──────────────────────────────────────────────────────────────────
 // 戦闘の敵スプライト: `images/enemy-{id}.png`（id は下表 0〜39）。タイトル等には使わない。欠落時は EnemySprite がベクターへフォールバック。
@@ -1389,15 +2041,16 @@ const ENEMIES = [
   { id:36,  name:"ダークナイト",   hp:65, atk:23, def:10, exp:48, gold:30 },
   { id:37,  name:"あんこくまじゅつし",hp:55, atk:22, def: 8, exp:45, gold:28, magic:{ name:"じごくのほのお",type:"dmg", power:18 }, drop:{ id:"potion", rate:0.25 } },
   // ─ ボス (洞窟のみ) ─
-  { id:38,  name:"ドランゴ",       hp:200, atk:24, def:10, exp:75, gold:50, magic:[
-    { name:"やみのいかずち", type:"dmg",  power:17 },
-    { name:"闇の吐息",     type:"dmg",  power:20 },
-    { name:"やみのことば", type:"fear" },
+  { id:38,  name:"ドランゴ",       hp:200, atk:24, def:10, exp:75, gold:50, formImageFile:"enemy-38.png", magic:[
+    { name:"ファイアートランスフォーメーション", type:"dmg", power:18, transformFile:"enemy-38.png", transformLabel:"炎竜形態" },
+    { name:"バブルトランスフォーメーション",   type:"dmg", power:16, transformFile:"enemy-38mizu.png", transformLabel:"水竜形態" },
+    { name:"ダークトランスフォーメーション",   type:"dmg", power:19, transformFile:"enemy-38kuro.png", transformLabel:"闇竜形態" },
+    { name:"ライトニングトランスフォーメーション", type:"dmg", power:17, transformFile:"enemy-38hikari.png", transformLabel:"光竜形態" },
   ] },
   // ─ 猫の森のレア枠 ─
-  { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:0.5 } },
+  { id:39,  name:"猫又",           hp:30, atk:13, def: 3, exp:21, gold:12, drop:{ id:"neko_konnyaku", rate:1.0 } },
   // ─ レアエンカウント ─
-  { id:40,  name:"メタにゃん",     hp:3,  atk:5,  def:99, exp:120, gold:1, flees:true },
+  { id:40,  name:"メタにゃん",     hp:3,  atk:5,  def:99, exp:60, gold:1, flees:true },
 ];
 
 const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e]));
@@ -1426,6 +2079,63 @@ function getRecorderHint(playerPos, itemId) {
   else                        dir = "左斜め下";
   return `……${dir}の方から　聞こえた気がした。`;
 }
+
+function hasBagItem(player, itemId) {
+  return (player?.bag || []).some((i) => i.id === itemId && i.count > 0);
+}
+
+function hasStoryFlag(player, flag) {
+  return (player?.storyFlags || []).includes(flag);
+}
+
+function canUseShip(player) {
+  return hasStoryFlag(player, "story:shipUnlocked");
+}
+
+function canUseAirship(player) {
+  return hasStoryFlag(player, "story:airshipUnlocked");
+}
+
+function getPlayerTitle(player) {
+  const flags = player?.storyFlags || [];
+  if (flags.includes("story:titleStarlight")) return "星あかりの冒険者";
+  if (flags.includes("story:drangoDefeated")) return "夜明けの勇者";
+  if (flags.includes("story:royalQuest")) return "王命の旅人";
+  return "かけだしの旅人";
+}
+
+function getMainProgress(player) {
+  if (!player) return { done: 0, total: 6, percent: 0, title: "かけだしの旅人" };
+  const checks = [
+    () => (player.storyFlags || []).includes("story:royalQuest"),
+    () => hasBagItem(player, "manabi_proof"),
+    () => hasBagItem(player, "ancient_key"),
+    () => hasBagItem(player, "dragon_scale"),
+    () => player.level >= 8,
+    () => (player.storyFlags || []).includes("story:drangoDefeated"),
+  ];
+  const done = checks.reduce((sum, fn) => sum + (fn() ? 1 : 0), 0);
+  const total = checks.length;
+  return {
+    done,
+    total,
+    percent: Math.round((done / total) * 100),
+    title: getPlayerTitle(player),
+  };
+}
+
+function getNextObjective(player) {
+  if (!player) return "旅の準備を整える";
+  const flags = player.storyFlags || [];
+  if (!flags.includes("story:royalQuest")) return "王城で王に会い、使命を受ける";
+  if (!hasBagItem(player, "manabi_proof")) return "まなびの村で『まなびのあかし』を手に入れる";
+  if (!hasBagItem(player, "ancient_key")) return "謎の村の試練を終えて『ふるびたかぎ』を得る";
+  if (!hasBagItem(player, "dragon_scale")) return "猫の村で『ドラゴンのウロコ』を得る";
+  if (player.level < 8) return "レベル8以上まで鍛える";
+  if (!flags.includes("story:drangoDefeated")) return "くらやみの洞窟最深部でドランゴを倒す";
+  if (!flags.includes("story:titleStarlight")) return "はじまりの村の隠し語り部を探す";
+  return "夜明けを見届けた。もう一度世界を旅しよう";
+}
 /** 戦闘用。PNG 未配置の id はベクター（`images/enemy-{id}.png` で上書き）。参照用: id→名前 */
 const ENEMY_VECTOR_FALLBACK_NAMES = Object.fromEntries(ENEMIES.map((e) => [e.id, e.name]));
 
@@ -1436,6 +2146,7 @@ function rng(min, max) {
   return min + (buf[0] % (max - min + 1));
 }
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const wrapCoord = (v, size) => ((v % size) + size) % size;
 
 // ─── 敵ゾーン設計（ストーリー地点対応）────────────────────────────────────────
 // スタート(0,0中心) → 町(dist≈12) → 学校(dist≈21) → 家(dist≈26) → 洞窟(dist≈34)
@@ -1447,18 +2158,25 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 // Zone E  dist 26〜31  : Lv6〜9    ツチモグラ・まどうし・ドクロナイト（家〜洞窟）
 // Zone F  dist 32+     : Lv9+      ダークナイト・あんこくまじゅつし（洞窟深部）
 function getEnemyForZone(tile, pos, isNight = false) {
+  const zoneA = Math.round(5 * WORLD_SCALE);
+  const zoneB = Math.round(12 * WORLD_SCALE);
+  const zoneC = Math.round(19 * WORLD_SCALE);
+  const zoneD = Math.round(25 * WORLD_SCALE);
+  const zoneE = Math.round(31 * WORLD_SCALE);
+  const mountainMid = Math.round(20 * WORLD_SCALE);
+  const mountainDeep = Math.round(28 * WORLD_SCALE);
   const cx = Math.floor(MAP_SIZE / 2), cy = Math.floor(MAP_SIZE / 2);
   const dist = Math.abs(pos.x - cx) + Math.abs(pos.y - cy);
 
   // ── 山岳タイル：距離で3段階 ──
   if (tile === TILE.MOUNTAIN) {
     if (isNight) {
-      if (dist > 28) return [E(26), E(29), E(25)][rng(0, 2)];
-      if (dist > 20) return [E(25), E(28), E(29)][rng(0, 2)];
+      if (dist > mountainDeep) return [E(26), E(29), E(25)][rng(0, 2)];
+      if (dist > mountainMid) return [E(25), E(28), E(29)][rng(0, 2)];
       return [E(24), E(25), E(27)][rng(0, 2)];
     }
-    if (dist > 28) return [E(26), E(29)][rng(0, 1)];
-    if (dist > 20) return [E(25), E(28)][rng(0, 1)];
+    if (dist > mountainDeep) return [E(26), E(29)][rng(0, 1)];
+    if (dist > mountainMid) return [E(25), E(28)][rng(0, 1)];
     return [E(24), E(27)][rng(0, 1)];
   }
   // ── 砂漠タイル：固有モンスター ──
@@ -1471,38 +2189,38 @@ function getEnemyForZone(tile, pos, isNight = false) {
     if (isNight) {
       const pool = dist > 24
         ? [E(18), E(19), E(22), E(23), E(21)]
-        : [E(18), E(20), E(22), E(23), E(39)];
+        : [E(18), E(20), E(22), E(23), E(17)];
       return pool[rng(0, pool.length - 1)];
     }
     const pool = dist > 24
-      ? [E(18), E(19), E(21), E(23), E(39)]
-      : [E(16), E(17), E(20), E(22), E(39)];
+      ? [E(18), E(19), E(21), E(23), E(17)]
+      : [E(16), E(17), E(20), E(22), E(18)];
     return pool[rng(0, pool.length - 1)];
   }
 
   // ── 草原・雪原・その他：6段階ゾーン ──
   // 夜は不死・闇系モンスターが出現
   if (isNight) {
-    if (dist <=  5) return [E(4),  E(7) ][rng(0, 1)];
-    if (dist <= 12) return [E(4),  E(7),  E(2),  E(6) ][rng(0, 3)];
-    if (dist <= 19) return [E(6),  E(7),  E(9),  E(13)][rng(0, 3)];
-    if (dist <= 25) return [E(12), E(13), E(11), E(14)][rng(0, 3)];
-    if (dist <= 31) { if (rng(1, 16) === 1) return E(40); return [E(12), E(13), E(35), E(36)][rng(0, 3)]; }
-    if (rng(1, 12) === 1) return E(40);
+    if (dist <= zoneA) return [E(4),  E(7) ][rng(0, 1)];
+    if (dist <= zoneB) return [E(4),  E(7),  E(2),  E(6) ][rng(0, 3)];
+    if (dist <= zoneC) return [E(6),  E(7),  E(9),  E(13)][rng(0, 3)];
+    if (dist <= zoneD) return [E(12), E(13), E(11), E(14)][rng(0, 3)];
+    if (dist <= zoneE) return [E(12), E(13), E(35), E(36)][rng(0, 3)];
+    if (rng(1, 18) === 1) return E(40);
     return [E(36), E(37)][rng(0, 1)];
   }
   // Zone A: スタート直後の超安全地帯（魔法なし・物理のみ）
-  if (dist <=  5) return [E(1), E(5)][rng(0, 1)];
+  if (dist <= zoneA) return [E(1), E(5)][rng(0, 1)];
   // Zone B: 〜町までの道中（低atk・魔法なし）
-  if (dist <= 12) return [E(0), E(1), E(3), E(4)][rng(0, 3)];
+  if (dist <= zoneB) return [E(0), E(1), E(3), E(4)][rng(0, 3)];
   // Zone C: 町〜学校（魔法系が初登場・Lv2以上想定）
-  if (dist <= 19) return [E(2), E(3), E(6), E(7)][rng(0, 3)];
+  if (dist <= zoneC) return [E(2), E(3), E(6), E(7)][rng(0, 3)];
   // Zone D: 学校〜家（中堅前半・装備強化後想定）
-  if (dist <= 25) return [E(8), E(9), E(14), E(15)][rng(0, 3)];
-  // Zone E: 家〜洞窟（中堅後半）メタにゃん 1/16
-  if (dist <= 31) { if (rng(1, 16) === 1) return E(40); return [E(10), E(11), E(12), E(13)][rng(0, 3)]; }
-  // Zone F: 洞窟深部　メタにゃん 1/12
-  if (rng(1, 12) === 1) return E(40);
+  if (dist <= zoneD) return [E(8), E(9), E(14), E(15)][rng(0, 3)];
+  // Zone E: 家〜洞窟（中堅後半）
+  if (dist <= zoneE) return [E(10), E(11), E(12), E(13)][rng(0, 3)];
+  // Zone F: 洞窟深部でのみメタにゃん 1/18
+  if (rng(1, 18) === 1) return E(40);
   return [E(36), E(37)][rng(0, 1)];
 }
 
@@ -1536,19 +2254,68 @@ function calcRawSpellDamage(power, enemy) {
 
 // 回復・睡眠＋ 火/水/雷 各3段（弱いほどMP安い）＋謎の村秘術
 const SPELLS = [
-  { name: "ひかりのいぶき", mp: 3, effect: "heal",  power: 26, msg: "体力が回復した！" },
-  { name: "ゆめしずく",     mp: 3, effect: "sleep", power:  0, msg: "眠りの呪文！" },
-  { name: "ひのこ",         mp: 2, effect: "elem", elem: "fire",    tier: 1, power:  7 },
-  { name: "かえん",         mp: 4, effect: "elem", elem: "fire",    tier: 2, power: 13 },
-  { name: "ごうか",         mp: 6, effect: "elem", elem: "fire",    tier: 3, power: 19 },
-  { name: "みずたま",       mp: 2, effect: "elem", elem: "water",   tier: 1, power:  7 },
-  { name: "あわなだれ",     mp: 4, effect: "elem", elem: "water",   tier: 2, power: 13 },
-  { name: "せいすい",       mp: 6, effect: "elem", elem: "water",   tier: 3, power: 19 },
-  { name: "びりびり",       mp: 2, effect: "elem", elem: "thunder", tier: 1, power:  7 },
-  { name: "いなずま",       mp: 4, effect: "elem", elem: "thunder", tier: 2, power: 13 },
-  { name: "らいめい",       mp: 6, effect: "elem", elem: "thunder", tier: 3, power: 19 },
-  { name: "せんにんのかぜ", mp: 6, effect: "wind",  power: 22, msg: "仙人の風が吹き荒れる！", secret: true },
+  { name: "ひかりのいぶき", mp: 3, effect: "heal",  power: 26, msg: "体力が回復した！", minLevel: 2 },
+  { name: "ゆめしずく",     mp: 3, effect: "sleep", power:  0, msg: "眠りの呪文！", minLevel: 3 },
+  { name: "ひのこ",         mp: 2, effect: "elem", elem: "fire",    tier: 1, power:  7, minLevel: 2 },
+  { name: "かえん",         mp: 4, effect: "elem", elem: "fire",    tier: 2, power: 13, minLevel: 5 },
+  { name: "ごうか",         mp: 6, effect: "elem", elem: "fire",    tier: 3, power: 19, minLevel: 8 },
+  { name: "みずたま",       mp: 2, effect: "elem", elem: "water",   tier: 1, power:  7, minLevel: 3 },
+  { name: "あわなだれ",     mp: 4, effect: "elem", elem: "water",   tier: 2, power: 13, minLevel: 6 },
+  { name: "せいすい",       mp: 6, effect: "elem", elem: "water",   tier: 3, power: 19, minLevel: 9 },
+  { name: "びりびり",       mp: 2, effect: "elem", elem: "thunder", tier: 1, power:  7, minLevel: 4 },
+  { name: "いなずま",       mp: 4, effect: "elem", elem: "thunder", tier: 2, power: 13, minLevel: 7 },
+  { name: "らいめい",       mp: 6, effect: "elem", elem: "thunder", tier: 3, power: 19, minLevel: 10 },
+  { name: "せんにんのかぜ", mp: 6, effect: "wind",  power: 22, msg: "仙人の風が吹き荒れる！", secret: true, minLevel: 10 },
 ];
+
+function getUnlockedSpells(player) {
+  const level = Number(player?.level || 1);
+  const hasSecret = !!player?.nazoSpellLearned;
+  return SPELLS.filter((spell) => {
+    if (level < (spell.minLevel || 1)) return false;
+    if (spell.secret && !hasSecret) return false;
+    return true;
+  });
+}
+
+function getSpellsLearnedBetweenLevels(fromLevel, toLevel, hasSecretSpell = false) {
+  const before = Math.max(0, Number(fromLevel || 0));
+  const after = Math.max(before, Number(toLevel || before));
+  return SPELLS.filter((spell) => {
+    const req = Number(spell.minLevel || 1);
+    if (req <= before || req > after) return false;
+    if (spell.secret && !hasSecretSpell) return false;
+    return true;
+  });
+}
+
+function getEnemyRecommendedLevel(enemyId) {
+  if (enemyId === 38) return 11;
+  if (enemyId === 40) return 11;
+  if (enemyId === 39) return 7;
+  if (enemyId <= 7) return 1 + (enemyId >= 6 ? 1 : 0);      // 1-2
+  if (enemyId <= 15) return 3 + ((enemyId - 8) >= 4 ? 1 : 0); // 3-4
+  if (enemyId <= 23) return 5 + ((enemyId - 16) >= 4 ? 2 : 1); // 6-7
+  if (enemyId <= 29) return 8 + ((enemyId - 24) >= 3 ? 2 : 1); // 9-10
+  if (enemyId <= 35) return 7 + ((enemyId - 30) >= 3 ? 2 : 1); // 8-9
+  if (enemyId <= 37) return 11;
+  return 5;
+}
+
+function getEnemyRecommendationRows() {
+  const rows = [
+    { label: "Lv1-2", ids: [5, 1, 0, 3, 4, 2, 6, 7] },
+    { label: "Lv3-4", ids: [8, 9, 10, 11, 12, 13, 14, 15] },
+    { label: "Lv6-7", ids: [16, 17, 18, 19, 20, 21, 22, 23, 39] },
+    { label: "Lv8-10", ids: [30, 31, 32, 33, 34, 35, 24, 25, 26, 27, 28, 29] },
+    { label: "Lv11+", ids: [36, 37, 40] },
+    { label: "ボス", ids: [38] },
+  ];
+  return rows.map((row) => ({
+    label: row.label,
+    names: row.ids.map((id) => ENEMY_BY_ID[id]?.name).filter(Boolean),
+  }));
+}
 
 // ─── PLAYER ───────────────────────────────────────────────────────────────────
 function makePlayer(name, gender) {
@@ -1573,18 +2340,26 @@ function makePlayer(name, gender) {
 }
 
 function checkLevelUp(player) {
-  const threshold = player.level * 15; // 元20から短縮
-  if (player.exp < threshold) return player;
-  return {
-    ...player,
-    level:  player.level + 1,
-    maxHp:  player.maxHp + 4,
-    hp:     player.maxHp + 4,
-    maxMp:  player.maxMp + 2,
-    mp:     player.maxMp + 2,
-    atk:    player.atk + 1,
-    def:    player.level % 2 === 1 ? player.def + 1 : player.def,
-    exp:    player.exp - threshold,
-  };
+  let next = { ...player };
+  let safety = 0;
+  while (safety < 50) {
+    const threshold = next.level * 15;
+    if (next.exp < threshold) break;
+    const nextLevel = next.level + 1;
+    next = {
+      ...next,
+      level: nextLevel,
+      maxHp: next.maxHp + 4,
+      hp: next.maxHp + 4,
+      maxMp: next.maxMp + 2,
+      mp: next.maxMp + 2,
+      // レベル依存を弱め、装備・行動選択の価値を上げる
+      atk: nextLevel % 2 === 0 ? next.atk + 1 : next.atk,
+      def: nextLevel % 3 === 0 ? next.def + 1 : next.def,
+      exp: next.exp - threshold,
+    };
+    safety += 1;
+  }
+  return next;
 }
 
