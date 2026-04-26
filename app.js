@@ -36,10 +36,19 @@ function App() {
 
   const movementBlockMessage = useCallback((tile, actor) => {
     if (tile === TILE.MOUNTAIN && !canUseAirship(actor)) {
+      if (canUseShip(actor)) {
+        return [
+          "山脈が　行く手を　ふさいでいる。",
+          "3つのあかしを集め、飛行船ドックを目指そう。",
+        ];
+      }
       return ["山脈が　行く手を　ふさいでいる。", "飛行船があれば　越えられそうだ。"];
     }
     if ([TILE.SEA, TILE.LAKE, TILE.WATER].includes(tile) && !canUseShip(actor)) {
-      return ["水辺が　行く手を　ふさいでいる。", "船を手に入れれば　渡れそうだ。"];
+      return [
+        "水辺が　行く手を　ふさいでいる。",
+        "王城の使命を受けて船着き場へ向かえば、渡れるはずだ。",
+      ];
     }
     return null;
   }, []);
@@ -302,7 +311,15 @@ function App() {
       return;
     }
     if (screen === SCREEN.INTERIOR) {
-      if (["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || "")) {
+      if (interiorType === "shipReef") {
+        startBgm("field");
+        return;
+      }
+      if (interiorType === "skySanctum") {
+        startBgm("boss");
+        return;
+      }
+      if (["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine", "shipReef", "skySanctum"].includes(interiorType || "")) {
         startBgm("town");
         return;
       }
@@ -333,7 +350,11 @@ function App() {
       }
       const scene = screen === SCREEN.BATTLE
         ? (isBoss ? "boss" : "battle")
-        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"].includes(interiorType || ""))
+        : (screen === SCREEN.INTERIOR && interiorType === "shipReef")
+          ? "field"
+          : (screen === SCREEN.INTERIOR && interiorType === "skySanctum")
+            ? "boss"
+        : (screen === SCREEN.INTERIOR && ["village", "town", "castle", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine", "shipReef", "skySanctum"].includes(interiorType || ""))
           ? "town"
           : (screen === SCREEN.INTERIOR && (interiorType === "cave" || interiorType === "catCave"))
             ? null
@@ -440,19 +461,25 @@ function App() {
     if (!hasOwn(LOCATION_EVENTS, key)) return;
     const mapEvent = LOCATION_EVENTS[key];
     if (mapEvent?.rewardFlag && hasStoryFlag(player, mapEvent.rewardFlag)) {
+      const revisitHintByFlag = {
+        "story:airshipUnlocked": "飛行船は　いつでも　君の合図を待っている。",
+        "story:shipUnlocked": "船は　いつでも　桟橋で待っている。",
+        "story:reefArrival": "潮騒が　静かに　帰りを歓迎している。",
+        "story:skyArrival": "祠の風鈴が　再訪を祝うように鳴っている。",
+      };
       setCurrentEvent({ messages: [
         "すでに　この地の力は　受け取っている。",
-        mapEvent.rewardFlag === "story:airshipUnlocked"
-          ? "飛行船は　いつでも　君の合図を待っている。"
-          : "船は　いつでも　桟橋で待っている。",
+        revisitHintByFlag[mapEvent.rewardFlag] || "静かな気配が　旅人を見守っている。",
       ]});
       setScreen(SCREEN.EVENT);
       return;
     }
     if (mapEvent?.requireStoryFlag && !hasStoryFlag(player, mapEvent.requireStoryFlag)) {
       const guide = mapEvent.requireStoryFlag === "story:shipUnlocked"
-        ? "まずは船を手に入れよう。"
-        : "王城で使命を受け、世界を巡ってから来よう。";
+        ? "まずは海鳴りの船着き場で船を受け取ろう。"
+        : mapEvent.requireStoryFlag === "story:airshipUnlocked"
+          ? "3つのあかしを集め、飛行船ドックで空への道を開こう。"
+          : "王城で使命を受け、3つのあかしを集めてから来よう。";
       setCurrentEvent({ messages: [
         "まだ　準備が足りないようだ。",
         guide,
@@ -464,6 +491,7 @@ function App() {
       setCurrentEvent({ messages: [
         "古い装置が　反応しない……。",
         "3つのあかしを　そろえる必要がありそうだ。",
+        "まなびの村・謎の村・猫の村を巡ってみよう。",
       ]});
       setScreen(SCREEN.EVENT);
       return;
@@ -474,6 +502,7 @@ function App() {
         setCurrentEvent({ messages: [
           "洞窟の周囲は　山脈に囲まれている。",
           "飛行船がなければ　この先へは進めない。",
+          "風読みの飛行船ドックで　空への道を開こう。",
         ]});
         setScreen(SCREEN.EVENT);
         return;
@@ -636,10 +665,14 @@ function App() {
         messages: hasSecretTitle ? [
           "ドランゴは　崩れ落ちた……。",
           "闇がほどけ、世界に　朝の光が戻ってくる。",
+          "遠くの港で　船鐘が鳴り、雲上では　祠の鈴が応えた。",
+          "村々に　灯りが戻り、子どもたちの笑い声が　風に広がる。",
           "『星あかりの冒険者』の名が、遠くで語られはじめた。",
         ] : [
           "ドランゴは　崩れ落ちた……。",
           "長い夜が終わり、世界に　朝の光が戻ってくる。",
+          "遠くの港で　船鐘が鳴り、雲上では　祠の鈴が応えた。",
+          "村々に　灯りが戻り、子どもたちの笑い声が　風に広がる。",
           "旅人の一歩が　この国の夜明けになった。",
         ],
       });

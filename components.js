@@ -6,47 +6,47 @@ const MINI_COLOR = {
   snow:"#c8dce8", onsen:"#4dd0e1",
 };
 
-const MINI_R = 12; // プレイヤー周囲±12タイルを表示
-const MINI_PX = 4; // 1タイル = 4px
-const MINI_SIZE = (MINI_R * 2 + 1) * MINI_PX; // = 100px
+const MINI_SIZE = 120; // 通常ミニマップの基準サイズ(px)
 
-function MiniMap({ player }) {
+function MiniMap({ player, mapSize = MINI_SIZE, viewSize = 78, style = {} }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, MINI_SIZE, MINI_SIZE);
+    ctx.clearRect(0, 0, mapSize, mapSize);
 
-    const cx = player.pos.x, cy = player.pos.y;
-    for (let dy = -MINI_R; dy <= MINI_R; dy++) {
-      for (let dx = -MINI_R; dx <= MINI_R; dx++) {
-        const wx = wrapCoord(cx + dx, MAP_SIZE);
-        const wy = wrapCoord(cy + dy, MAP_SIZE);
-        const px = (dx + MINI_R) * MINI_PX, py = (dy + MINI_R) * MINI_PX;
-        ctx.fillStyle = MINI_COLOR[MAP_GRID[wy][wx]] ?? "#333";
-        ctx.fillRect(px, py, MINI_PX, MINI_PX);
+    const tilePx = mapSize / MAP_SIZE;
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const px = x * tilePx;
+        const py = y * tilePx;
+        ctx.fillStyle = MINI_COLOR[MAP_GRID[y][x]] ?? "#333";
+        ctx.fillRect(px, py, tilePx + 0.2, tilePx + 0.2);
       }
     }
-    // 特殊地点
+    // 特殊地点（視認性のため少し大きめに描画）
     Object.values(SPECIAL_POS).forEach(({ x, y }) => {
-      const px = (x - cx + MINI_R) * MINI_PX, py = (y - cy + MINI_R) * MINI_PX;
-      if (px >= 0 && py >= 0 && px < MINI_SIZE && py < MINI_SIZE) {
-        ctx.fillStyle = "#ffd700";
-        ctx.fillRect(px, py, MINI_PX, MINI_PX);
-      }
+      const px = x * tilePx;
+      const py = y * tilePx;
+      const dot = Math.max(1.5, tilePx * 1.25);
+      ctx.fillStyle = "#ffd700";
+      ctx.fillRect(px - dot * 0.2, py - dot * 0.2, dot, dot);
     });
-    // プレイヤー（常に中央）
-    const mid = MINI_R * MINI_PX;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(mid, mid, MINI_PX, MINI_PX);
-  }, [player.pos.x, player.pos.y]);
+    // プレイヤー位置
+    const pp = Math.max(2, tilePx * 1.4);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
+  }, [player.pos.x, player.pos.y, mapSize]);
 
   return (
-    <canvas ref={canvasRef} width={MINI_SIZE} height={MINI_SIZE}
-      style={{ position:"absolute", top:4, right:4, width:78, height:78,
+    <canvas ref={canvasRef} width={mapSize} height={mapSize}
+      style={{ position:"absolute", top:4, right:4, width:viewSize, height:viewSize,
                imageRendering:"pixelated", border:"1px solid #888",
-               borderRadius:2, opacity:0.92, background:"#111" }} />
+               borderRadius:2, opacity:0.92, background:"#111", ...style }} />
   );
 }
 
@@ -2211,10 +2211,47 @@ function PrologueScreen({ playerName, onDone }) {
 
 // ─── MAP SCREEN (スプライト + キーボード対応) ─────────────────────────────────
 function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight = false }) {
-  const handleMovePointer = (dx, dy) => (e) => {
+  const [showLargeMap, setShowLargeMap] = useState(false);
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 390,
+    h: typeof window !== "undefined" ? window.innerHeight : 844,
+  }));
+  const moveHoldRef = useRef(null);
+  const stopMoveHold = useCallback(() => {
+    if (moveHoldRef.current) {
+      clearInterval(moveHoldRef.current);
+      moveHoldRef.current = null;
+    }
+  }, []);
+  const handleMovePointer = useCallback((dx, dy) => (e) => {
     e.preventDefault();
     onMove(dx, dy);
-  };
+    stopMoveHold();
+    moveHoldRef.current = setInterval(() => onMove(dx, dy), 120);
+  }, [onMove, stopMoveHold]);
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  useEffect(() => () => stopMoveHold(), [stopMoveHold]);
+  const compactLayout = viewport.h < 760;
+  const mapFramePx = Math.min(340, Math.max(252, viewport.w - 68));
+  let tileSize = Math.floor(mapFramePx / VIEW_SIZE);
+  if (compactLayout) tileSize = Math.min(tileSize, 30);
+  tileSize = clamp(tileSize, 26, 34);
+  const heroSize = Math.max(22, tileSize - 4);
+  const iconSize = Math.max(16, tileSize - 10);
+  const dpadBtn = compactLayout ? 36 : 40;
+  const actionBtn = compactLayout ? 44 : 48;
+  const centerBtn = compactLayout ? 36 : 40;
+  const dpadWrap = dpadBtn * 3 + 8;
+  const largeMapView = Math.max(220, Math.min(viewport.w - 34, viewport.h - (compactLayout ? 280 : 320)));
+  const toggleLargeMap = useCallback(() => setShowLargeMap((v) => !v), []);
   const { pos } = player;
   const key = `${pos.y},${pos.x}`;
   const event = LOCATION_EVENTS[key];
@@ -2252,11 +2289,12 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
       else if (e.key === "ArrowRight" || e.key === "d") { e.preventDefault(); onMove( 1, 0); }
       else if (e.key === "Enter" || e.key === " ")      { e.preventDefault(); onInvestigate(); }  // A = はなす
       else if (e.key === "i" || e.key === "Escape" || e.key === "x") { e.preventDefault(); onInfo(); }  // B = メニュー
+      else if (e.key === "c" || e.key === "C") { e.preventDefault(); toggleLargeMap(); } // C = 全体地図トグル
       else if (e.key === "q") { e.preventDefault(); onQuickSave && onQuickSave(); } // START = クイックセーブ
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onMove, onInvestigate, onInfo, onQuickSave]);
+  }, [onMove, onInvestigate, onInfo, onQuickSave, toggleLargeMap]);
 
   useEffect(() => {
     let rafId = null;
@@ -2298,10 +2336,10 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
         <HPBar label="MP" current={player.mp} max={player.maxMp} color="blue" />
       </div>
 
-      {/* マップビュー + ミニマップ */}
+      {/* マップビュー（自分の周り） + 全体ミニマップ */}
       <div className="flex justify-center relative">
         <div className="relative">
-          <div className="inline-grid gap-0.5" style={{ gridTemplateColumns:`repeat(${VIEW_SIZE},34px)` }}>
+          <div className="inline-grid gap-0.5" style={{ gridTemplateColumns:`repeat(${VIEW_SIZE},${tileSize}px)` }}>
             {viewRows.map((row) =>
               row.map(({ x, y, tile }) => {
                 const isPlayer = pos.x === x && pos.y === y;
@@ -2309,13 +2347,14 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
                 const landmarkType = getWorldLandmarkType(tile, x, y);
                 return (
                   <div key={`${y}-${x}`}
-                    className={`relative w-[34px] h-[34px] flex items-center justify-center text-base border transition-all duration-150 ${isPlayer ? "border-yellow-400 scale-110" : "border-gray-700/40"}`}>
-                    <TileCanvas tile={tile} size={34} />
+                    className={`relative flex items-center justify-center text-base border transition-all duration-150 ${isPlayer ? "border-yellow-400 scale-110" : "border-gray-700/40"}`}
+                    style={{ width: tileSize, height: tileSize }}>
+                    <TileCanvas tile={tile} size={tileSize} />
                     <span style={{ position:"relative", zIndex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
                       {isPlayer
-                        ? <HeroSprite gender={player.gender} direction={player.direction} animStep={player.animStep} size={30} />
-                        : isSign ? <SignPostIcon size={22} />
-                        : landmarkType ? <WorldLandmarkIcon kind={landmarkType} size={24} /> : null}
+                        ? <HeroSprite gender={player.gender} direction={player.direction} animStep={player.animStep} size={heroSize} />
+                        : isSign ? <SignPostIcon size={iconSize} />
+                        : landmarkType ? <WorldLandmarkIcon kind={landmarkType} size={iconSize + 2} /> : null}
                     </span>
                   </div>
                 );
@@ -2328,6 +2367,24 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
           )}
         </div>
         <MiniMap player={player} />
+        {showLargeMap && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/78 pointer-events-none">
+            <MiniMap
+              player={player}
+              mapSize={Math.floor(largeMapView)}
+              viewSize={Math.floor(largeMapView)}
+              style={{
+                position: "relative",
+                top: "auto",
+                right: "auto",
+                border: "2px solid #ddd",
+                borderRadius: 6,
+                opacity: 1,
+                boxShadow: "0 0 0 2px rgba(0,0,0,0.35)",
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* 現在地 */}
@@ -2343,30 +2400,38 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
       </div>
 
       {/* コントロール */}
-      <div className="mt-auto border-2 border-zinc-500 bg-zinc-800 rounded-md p-3 shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]">
+      <div
+        className={`mt-1 border-2 border-zinc-500 bg-zinc-800 rounded-md ${compactLayout ? "p-2" : "p-3"} shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]`}
+        style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 8px)" }}
+        onPointerUp={stopMoveHold}
+        onPointerCancel={stopMoveHold}
+        onPointerLeave={stopMoveHold}
+      >
         <div className="flex justify-between items-end gap-2">
           {/* 十字キー */}
-          <div className="grid grid-cols-3 gap-1 w-[126px]">
+          <div className="grid grid-cols-3 gap-1" style={{ width: dpadWrap }}>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,-1)}>▲</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,-1)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▲</button>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(-1,0)}>◀</button>
-            <div className="w-10 h-10 bg-zinc-900 border border-zinc-700 rounded-sm" />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(1,0)}>▶</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(-1,0)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>◀</button>
+            <div style={{ width: centerBtn, height: centerBtn }} className="bg-zinc-900 border border-zinc-700 rounded-sm" />
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(1,0)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▶</button>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,1)}>▼</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,1)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▼</button>
             <div />
           </div>
           {/* SELECT / START */}
-          <div className="flex flex-col justify-end items-center gap-2 pb-1">
-            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={onInfo}>SELECT</button>
-            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={() => onQuickSave && onQuickSave()}>START</button>
+          <div className={`flex flex-col justify-end items-center ${compactLayout ? "gap-1 pb-0.5" : "gap-2 pb-1"}`}>
+            <button className={`px-3 ${compactLayout ? "py-0.5 text-[8px]" : "py-1 text-[9px]"} bg-zinc-700 border border-zinc-400 rounded-full active:scale-95 leading-tight text-center`} onClick={onInfo}>SELECT</button>
+            <button className={`px-3 ${compactLayout ? "py-0.5 text-[8px]" : "py-1 text-[9px]"} bg-zinc-700 border border-zinc-400 rounded-full active:scale-95 leading-tight text-center`} onClick={() => onQuickSave && onQuickSave()}>START</button>
+            <button className={`px-3 ${compactLayout ? "py-0.5 text-[8px]" : "py-1 text-[9px]"} ${showLargeMap ? "bg-cyan-700 border-cyan-300 text-cyan-100" : "bg-zinc-700 border-zinc-400"} border rounded-full active:scale-95 leading-tight text-center`} onClick={toggleLargeMap}>C</button>
           </div>
           {/* B / A ボタン */}
-          <div className="flex gap-2 pb-1 items-end">
-            <button className="w-12 h-12 rounded-full bg-red-700 border-2 border-red-400 text-white text-sm active:scale-95" onClick={onInfo}>B</button>
+          <div className={`flex gap-2 ${compactLayout ? "pb-0.5" : "pb-1"} items-end`}>
+            <button style={{ width: actionBtn, height: actionBtn }} className="rounded-full bg-red-700 border-2 border-red-400 text-white text-sm active:scale-95" onClick={onInfo}>B</button>
             <button
-              className={`w-12 h-12 rounded-full border-2 text-sm active:scale-95 ${canInvestigate ? "bg-red-700 border-red-400 text-white animate-pulse" : "bg-zinc-900 border-zinc-700 text-zinc-500"} ${canInvestigate ? "" : "cursor-not-allowed"}`}
+              style={{ width: actionBtn, height: actionBtn }}
+              className={`rounded-full border-2 text-sm active:scale-95 ${canInvestigate ? "bg-red-700 border-red-400 text-white animate-pulse" : "bg-zinc-900 border-zinc-700 text-zinc-500"} ${canInvestigate ? "" : "cursor-not-allowed"}`}
               disabled={!canInvestigate}
               onClick={canInvestigate ? onInvestigate : undefined}
             >
@@ -2381,6 +2446,10 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
 
 // ─── INTERIOR MAP SCREEN (NEW) ────────────────────────────────────────────────
 function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInfo, onBoss, onEnemyBattle, onBuy, onFlag, onLearnSpell, onOpenTreasure, onGiveItem }) {
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 390,
+    h: typeof window !== "undefined" ? window.innerHeight : 844,
+  }));
   const isCave = interiorType === "cave";
   const isCatCave = interiorType === "catCave";
   const isDungeon = isCave || isCatCave;
@@ -2430,6 +2499,8 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     : interiorType === "nazoVillage" ? "謎の村 (内部)"
     : interiorType === "catVillage" ? "猫の村 (内部)"
     : interiorType === "southShrine" ? "南の祠"
+    : interiorType === "shipReef" ? "潮騒の環礁"
+    : interiorType === "skySanctum" ? "天空の祠"
     : "まなびの学校 (内部)";
 
   const [intPos, setIntPos] = useState({ x: exitPos.x, y: Math.max(0, exitPos.y - 1) });
@@ -2628,6 +2699,24 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
         ]};
       }
     }
+    if (interiorType === "shipReef" && eventKey === "2,5") {
+      const hasBeacon = (player.storyFlags || []).includes("story:reefBeacon");
+      if (hasBeacon) {
+        ev = { messages: [
+          "潮騒の精：「波は　いつでも　旅人を見守っている。",
+          "迷ったら　耳をすませ。道は　必ずある。」",
+        ]};
+      }
+    }
+    if (interiorType === "skySanctum" && eventKey === "4,5") {
+      const hasBlessing = (player.storyFlags || []).includes("story:skySanctumCleared");
+      if (hasBlessing) {
+        ev = { messages: [
+          "風祠の巫女：「風の加護は　もう　あなたと共にあります。",
+          "あとは　信じて　進むだけです。」",
+        ]};
+      }
+    }
     return ev;
   }, [events, interiorType, player]);
 
@@ -2647,7 +2736,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   }, [resolveEventForNpc, onHeal, onBuff, usedBuffKeys, onFlag, onLearnSpell]);
 
   useEffect(() => {
-    const movableInteriors = ["village", "town", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine"];
+    const movableInteriors = ["village", "town", "artisanVillage", "manabiVillage", "nazoVillage", "catVillage", "underground", "southShrine", "shipReef", "skySanctum"];
     if (!movableInteriors.includes(interiorType)) return undefined;
     if (intEvent || showShop) return undefined;
     const timer = setInterval(() => {
@@ -2781,7 +2870,29 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
     return () => window.removeEventListener("keydown", handler);
   }, [tryMove, investigate, intEvent]);
 
-  const handleMovePointer = (dx, dy) => (e) => { e.preventDefault(); tryMove(dx, dy); };
+  const moveHoldRef = useRef(null);
+  const stopMoveHold = useCallback(() => {
+    if (moveHoldRef.current) {
+      clearInterval(moveHoldRef.current);
+      moveHoldRef.current = null;
+    }
+  }, []);
+  const handleMovePointer = useCallback((dx, dy) => (e) => {
+    e.preventDefault();
+    tryMove(dx, dy);
+    stopMoveHold();
+    moveHoldRef.current = setInterval(() => tryMove(dx, dy), 120);
+  }, [tryMove, stopMoveHold]);
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  useEffect(() => () => stopMoveHold(), [stopMoveHold]);
 
   if (showShop) {
     return (
@@ -2809,7 +2920,13 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
   const useViewport = !isDungeon && (rows > 13 || cols > 13);
   const viewW = useViewport ? Math.min(cols, INT_VIEW) : cols;
   const viewH = useViewport ? Math.min(rows, INT_VIEW) : rows;
-  const TS = Math.max(20, Math.floor(336 / viewW));
+  const compactLayout = viewport.h < 760;
+  const baseMapPx = Math.min(336, Math.max(264, viewport.w - 56));
+  const TS = Math.max(18, Math.floor((compactLayout ? Math.min(baseMapPx, 300) : baseMapPx) / viewW));
+  const dpadBtn = compactLayout ? 36 : 40;
+  const actionBtn = compactLayout ? 44 : 48;
+  const centerBtn = compactLayout ? 36 : 40;
+  const dpadWrap = dpadBtn * 3 + 8;
   const camX = useViewport ? Math.max(0, Math.min(cols - viewW, intPos.x - Math.floor(viewW / 2))) : 0;
   const camY = useViewport ? Math.max(0, Math.min(rows - viewH, intPos.y - Math.floor(viewH / 2))) : 0;
   const renderCells = useViewport
@@ -2900,27 +3017,34 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
         {isDungeon ? "A/Enterで調べる（机越しOK） ／ 階段で階層移動" : "A/Enterで調べる（机越しOK） ／ 出口へ乗ると外へ"}
       </p>
 
-      <div className="mt-auto border-2 border-zinc-500 bg-zinc-800 rounded-md p-3 shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]">
+      <div
+        className={`mt-1 border-2 border-zinc-500 bg-zinc-800 rounded-md ${compactLayout ? "p-2" : "p-3"} shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]`}
+        style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 8px)" }}
+        onPointerUp={stopMoveHold}
+        onPointerCancel={stopMoveHold}
+        onPointerLeave={stopMoveHold}
+      >
         <div className="flex justify-between items-end gap-2">
-          <div className="grid grid-cols-3 gap-1 w-[126px]">
+          <div className="grid grid-cols-3 gap-1" style={{ width: dpadWrap }}>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,-1)}>▲</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,-1)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▲</button>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(-1,0)}>◀</button>
-            <div className="w-10 h-10 bg-zinc-900 border border-zinc-700 rounded-sm" />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(1,0)}>▶</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(-1,0)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>◀</button>
+            <div style={{ width: centerBtn, height: centerBtn }} className="bg-zinc-900 border border-zinc-700 rounded-sm" />
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(1,0)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▶</button>
             <div />
-            <button className="w-10 h-10 bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,1)}>▼</button>
+            <button style={{ width: dpadBtn, height: dpadBtn }} className="bg-zinc-700 border border-zinc-400 text-white active:scale-95" onPointerDown={handleMovePointer(0,1)} onPointerUp={stopMoveHold} onPointerCancel={stopMoveHold} onPointerLeave={stopMoveHold}>▼</button>
             <div />
           </div>
-          <div className="flex flex-col justify-end items-center gap-2 pb-1">
-            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={onInfo}>SELECT</button>
-            <button className="px-3 py-1 bg-zinc-700 border border-zinc-400 text-[9px] rounded-full active:scale-95 leading-tight text-center" onClick={investigate}>START</button>
+          <div className={`flex flex-col justify-end items-center ${compactLayout ? "gap-1 pb-0.5" : "gap-2 pb-1"}`}>
+            <button className={`px-3 ${compactLayout ? "py-0.5 text-[8px]" : "py-1 text-[9px]"} bg-zinc-700 border border-zinc-400 rounded-full active:scale-95 leading-tight text-center`} onClick={onInfo}>SELECT</button>
+            <button className={`px-3 ${compactLayout ? "py-0.5 text-[8px]" : "py-1 text-[9px]"} bg-zinc-700 border border-zinc-400 rounded-full active:scale-95 leading-tight text-center`} onClick={investigate}>START</button>
           </div>
-          <div className="flex gap-2 pb-1 items-end">
-            <button className="w-12 h-12 rounded-full bg-red-700 border-2 border-red-400 text-white text-sm active:scale-95" onClick={onInfo}>B</button>
+          <div className={`flex gap-2 ${compactLayout ? "pb-0.5" : "pb-1"} items-end`}>
+            <button style={{ width: actionBtn, height: actionBtn }} className="rounded-full bg-red-700 border-2 border-red-400 text-white text-sm active:scale-95" onClick={onInfo}>B</button>
             <button
-              className={`w-12 h-12 rounded-full border-2 text-sm active:scale-95 ${canInvestigateNow ? "bg-red-700 border-red-400 text-white animate-pulse" : "bg-zinc-900 border-zinc-700 text-zinc-500"} ${canInvestigateNow ? "" : "cursor-not-allowed"}`}
+              style={{ width: actionBtn, height: actionBtn }}
+              className={`rounded-full border-2 text-sm active:scale-95 ${canInvestigateNow ? "bg-red-700 border-red-400 text-white animate-pulse" : "bg-zinc-900 border-zinc-700 text-zinc-500"} ${canInvestigateNow ? "" : "cursor-not-allowed"}`}
               disabled={!canInvestigateNow}
               onClick={canInvestigateNow ? investigate : undefined}
             >
@@ -3280,7 +3404,7 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
             transform: isBoss && enemyFlash ? "translateX(2px)" : "none",
             transition: "transform 70ms linear",
           }}>
-          <EnemySprite enemy={enemy} size={isBoss ? 108 : 84} flash={enemyFlash} />
+          <EnemySprite enemy={enemy} size={(isBoss ? 108 : 84) * 1.1} flash={enemyFlash} />
         </div>
         <p className="text-sm font-bold">{enemy.name}</p>
         {enemy.formLabel && <p className="text-[10px] text-fuchsia-300">{enemy.formLabel}</p>}

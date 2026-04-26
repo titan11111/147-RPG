@@ -154,9 +154,11 @@ const SPECIAL_POS = {
   nazoVillage:   { x: scaleWorldCoord(5), y: scaleWorldCoord(45) },  // 謎の村（仙人マンたちの村）
   catVillage:    { x: scaleWorldCoord(46), y: scaleWorldCoord(6) },  // 猫の村
   onsen:         { x: scaleWorldCoord(40), y: scaleWorldCoord(36) }, // 雪原の露天温泉（地下への入口）
-  southShrine:   { x: scaleWorldCoord(24), y: scaleWorldCoord(40) }, // 南の祠（占い婆さん・道聞きリコーダー）
+  southShrine:   { x: scaleWorldCoord(24), y: scaleWorldCoord(29) }, // 南の祠（山脈の北側）
   shipyard:      { x: scaleWorldCoord(27), y: scaleWorldCoord(30) }, // 船入手イベント
   airDock:       { x: scaleWorldCoord(45), y: scaleWorldCoord(32) }, // 飛行船入手イベント
+  shipReef:      { x: scaleWorldCoord(33), y: scaleWorldCoord(37) }, // 船専用の寄り道島
+  skySanctum:    { x: scaleWorldCoord(44), y: scaleWorldCoord(20) }, // 飛行船専用の天空祠
 };
 
 const SAVE_POINT_POS = [
@@ -193,6 +195,8 @@ const WORLD_MARKERS = {
   [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: "village",
   [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]: "village",
   [`${SPECIAL_POS.airDock.y},${SPECIAL_POS.airDock.x}`]: "village",
+  [`${SPECIAL_POS.shipReef.y},${SPECIAL_POS.shipReef.x}`]: "village",
+  [`${SPECIAL_POS.skySanctum.y},${SPECIAL_POS.skySanctum.x}`]: "village",
 };
 
 function getWorldLandmarkType(tile, x, y) {
@@ -567,7 +571,16 @@ function generateMapGrid() {
       const x = cx + dx;
       if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.WATER;
     }
-    if (y % 16 === 8) grid[y][cx] = TILE.BRIDGE;
+    if (y % 16 === 8) {
+      // 橋は川の中央1マスではなく、両岸までつながる幅で敷く
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = cx + dx;
+        if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.BRIDGE;
+      }
+      // 取り付き口（岸）を最低限の陸地にして渡れる状態を保証
+      if (cx - 2 > 0) grid[y][cx - 2] = TILE.GRASS;
+      if (cx + 2 < MAP_SIZE - 1) grid[y][cx + 2] = TILE.GRASS;
+    }
   }
 
   const seaBaseX = Math.floor(MAP_SIZE * 0.56);
@@ -578,6 +591,21 @@ function generateMapGrid() {
       if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.SEA;
     }
   }
+  // 東側へ渡るための固定橋（海峡を岸まで接続）
+  const eastBridgeRows = [
+    Math.round(MAP_SIZE * 0.44),
+    Math.round(MAP_SIZE * 0.74),
+  ];
+  eastBridgeRows.forEach((yRaw) => {
+    const y = Math.max(1, Math.min(MAP_SIZE - 2, yRaw));
+    const cx = seaBaseX + Math.round(Math.sin(y / 9) * 2);
+    for (let dx = -2; dx <= 2; dx++) {
+      const x = cx + dx;
+      if (x > 0 && x < MAP_SIZE - 1) grid[y][x] = TILE.BRIDGE;
+    }
+    if (cx - 3 > 0) grid[y][cx - 3] = TILE.GRASS;
+    if (cx + 3 < MAP_SIZE - 1) grid[y][cx + 3] = TILE.GRASS;
+  });
 
   const ridgeBaseY = Math.floor(MAP_SIZE * 0.66);
   for (let x = 1; x < MAP_SIZE - 1; x++) {
@@ -611,8 +639,30 @@ function generateMapGrid() {
   grid[SPECIAL_POS.southShrine.y][SPECIAL_POS.southShrine.x]   = TILE.TOWN;
   grid[SPECIAL_POS.shipyard.y][SPECIAL_POS.shipyard.x]         = TILE.TOWN;
   grid[SPECIAL_POS.airDock.y][SPECIAL_POS.airDock.x]           = TILE.TOWN;
+  grid[SPECIAL_POS.shipReef.y][SPECIAL_POS.shipReef.x]         = TILE.TOWN;
+  grid[SPECIAL_POS.skySanctum.y][SPECIAL_POS.skySanctum.x]     = TILE.TOWN;
   // セーブポイント（雪ゾーン外に固定）
   SAVE_POINT_POS.forEach(({ y, x }) => { grid[y][x] = TILE.GRASS; });
+
+  // 重要地点の到達保証（海・川・山に埋もれないよう周囲を陸地化）
+  const ensureLandAccess = (pos, radius = 1) => {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = pos.x + dx;
+        const y = pos.y + dy;
+        if (x <= 0 || y <= 0 || x >= MAP_SIZE - 1 || y >= MAP_SIZE - 1) continue;
+        if (dx === 0 && dy === 0) continue;
+        if ([TILE.SEA, TILE.LAKE, TILE.WATER, TILE.MOUNTAIN].includes(grid[y][x])) {
+          grid[y][x] = TILE.GRASS;
+        }
+      }
+    }
+  };
+  ensureLandAccess(SPECIAL_POS.shipyard, 2);
+  ensureLandAccess(SPECIAL_POS.southShrine, 1);
+  // 中心タイルは町扱いを維持
+  grid[SPECIAL_POS.shipyard.y][SPECIAL_POS.shipyard.x] = TILE.TOWN;
+  grid[SPECIAL_POS.southShrine.y][SPECIAL_POS.southShrine.x] = TILE.TOWN;
 
   // ─ 雪原生成（洞窟周辺をSNOWタイルで覆う）────────────────────────────────
   const FIXED_TILES = new Set([TILE.SEA, TILE.LAKE, TILE.WATER, TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE]);
@@ -643,9 +693,25 @@ function generateMapGrid() {
       }
     }
   };
+  const carveAirDockApproach = () => {
+    // 飛行船ドックは「船で接岸して上陸」できるよう西側に潮の回廊を固定する。
+    const y = SPECIAL_POS.airDock.y;
+    const xs = [SPECIAL_POS.airDock.x - 1, SPECIAL_POS.airDock.x - 2, SPECIAL_POS.airDock.x - 3];
+    xs.forEach((x) => {
+      if (!inBounds(x, y)) return;
+      if ([TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE, TILE.ONSEN].includes(grid[y][x])) return;
+      grid[y][x] = TILE.SEA;
+    });
+    // 接岸地点の北側は草地にして、上陸後の進行方向を読み取りやすくする。
+    const dockEdgeX = SPECIAL_POS.airDock.x - 1;
+    const dockEdgeY = y - 1;
+    if (inBounds(dockEdgeX, dockEdgeY) && ![TILE.TOWN, TILE.CAVE].includes(grid[dockEdgeY][dockEdgeX])) {
+      grid[dockEdgeY][dockEdgeX] = TILE.GRASS;
+    }
+  };
 
   // Area4: 船専用エリア（海で囲った島）
-  [SPECIAL_POS.manabiVillage, SPECIAL_POS.nazoVillage, SPECIAL_POS.catVillage].forEach((pos) => {
+  [SPECIAL_POS.manabiVillage, SPECIAL_POS.nazoVillage, SPECIAL_POS.catVillage, SPECIAL_POS.shipReef].forEach((pos) => {
     paintRing(pos, 1, TILE.SEA);
     paintRing(pos, 2, TILE.SEA);
   });
@@ -654,12 +720,18 @@ function generateMapGrid() {
   paintRing(SPECIAL_POS.airDock, 1, TILE.MOUNTAIN);
   paintRing(SPECIAL_POS.airDock, 2, TILE.MOUNTAIN);
   grid[SPECIAL_POS.airDock.y][SPECIAL_POS.airDock.x] = TILE.TOWN;
+  carveAirDockApproach();
 
   // Area6: 最終洞窟（山脈に囲まれ、飛行船でのみ到達）
   paintRing(SPECIAL_POS.cave, 1, TILE.MOUNTAIN);
   paintRing(SPECIAL_POS.cave, 2, TILE.MOUNTAIN);
   paintRing(SPECIAL_POS.cave, 3, TILE.MOUNTAIN);
   grid[SPECIAL_POS.cave.y][SPECIAL_POS.cave.x] = TILE.CAVE;
+
+  // Area7: 天空祠（飛行船で立ち寄る寄り道ダンジョン）
+  paintRing(SPECIAL_POS.skySanctum, 1, TILE.MOUNTAIN);
+  paintRing(SPECIAL_POS.skySanctum, 2, TILE.MOUNTAIN);
+  grid[SPECIAL_POS.skySanctum.y][SPECIAL_POS.skySanctum.x] = TILE.TOWN;
 
   return grid;
 }
@@ -723,6 +795,10 @@ const SIGN_MAP = (() => {
     { pos: SPECIAL_POS.catVillage,    name: '猫の村' },
     { pos: SPECIAL_POS.onsen,         name: '雪原の温泉' },
     { pos: SPECIAL_POS.southShrine,   name: '南の祠' },
+    { pos: SPECIAL_POS.shipyard,      name: '海鳴りの船着き場' },
+    { pos: SPECIAL_POS.airDock,       name: '風読みの飛行船ドック' },
+    { pos: SPECIAL_POS.shipReef,      name: '潮騒の環礁' },
+    { pos: SPECIAL_POS.skySanctum,    name: '天空の祠' },
   ];
   // 近すぎる案内を避けるため、まず遠距離(6〜8マス)を優先して配置する。
   // 迷ったときに見つける「道しるべ」として機能させる。
@@ -1188,6 +1264,32 @@ const SOUTH_SHRINE_IMAP = parseIntMap([
   "W....E.....W",  // row 9: 出口
   "WWWWWWWWWWWW",  // row 10
 ]);
+const SHIP_REEF_IMAP = parseIntMap([
+  "WWWWWWWWWWWW",
+  "W..........W",
+  "W....N.....W",
+  "W..........W",
+  "W..F.......W",
+  "W.....T....W",
+  "W..........W",
+  "W....T.....W",
+  "W..........W",
+  "W....E.....W",
+  "WWWWWWWWWWWW",
+]);
+const SKY_SANCTUM_IMAP = parseIntMap([
+  "WWWWWWWWWWWW",
+  "W....B.....W",
+  "W..T...T...W",
+  "W..........W",
+  "W....N.....W",
+  "W..........W",
+  "W..F.......W",
+  "W..........W",
+  "W.......T..W",
+  "W....E.....W",
+  "WWWWWWWWWWWW",
+]);
 
 const INTERIOR_MAPS = {
   village: VILLAGE_IMAP, town: TOWN_IMAP, school: SCHOOL_IMAP,
@@ -1197,6 +1299,7 @@ const INTERIOR_MAPS = {
   cave: CAVE_IMAP, manabiVillage: MANABI_VILLAGE_IMAP, nazoVillage: NAZO_VILLAGE_IMAP,
   catVillage: CAT_VILLAGE_IMAP, underground: UNDERGROUND_IMAP,
   southShrine: SOUTH_SHRINE_IMAP,
+  shipReef: SHIP_REEF_IMAP, skySanctum: SKY_SANCTUM_IMAP,
 };
 
 const CAVE_EVENTS_BY_FLOOR = {
@@ -1736,6 +1839,8 @@ const INTERIOR_EVENTS = {
       "姫：「……勇者よ。」",
       "「父である王が　あなたに　使命を　伝えたいと言っています。」",
       "「どうか　玉座の前へ。」",
+      "「海鳴りの船着き場は　王城から南東です。」",
+      "「山脈の手前を　東へ進み、海のきわを　探してみてください。」",
     ], heal: 3, fixedNpc: true },
     "5,8": { messages: [
       "大臣：「王は　この国の行く末を　案じておられる。",
@@ -1752,6 +1857,8 @@ const INTERIOR_EVENTS = {
       "「ふたつ——　謎を解く者が持つ　『ふるびたかぎ』。」",
       "「みっつ——　猫の血族が守る　『ドラゴンのウロコ』。」",
       "「3つ揃いし者のみが　洞窟への道を　開けることができる。」",
+      "「それと　南の祠を　訪ねよ。」",
+      "「祠は　山脈の北側、王城から南東へ進んだ先に　ある。」",
       "「…………頼む。　この国の　子らの笑い声を——　取り戻してくれ。」",
       "王が深々と　頭を垂れた。",
       "王から　使命を　授かった！",
@@ -1775,6 +1882,32 @@ const INTERIOR_EVENTS = {
       "占い婆さん：「……来たか。予言しておったぞ。",
     ]},
   },
+  shipReef: {
+    "2,5": { messages: [
+      "潮騒の精：「ようこそ、旅人。",
+      "ここは　船乗りだけが　辿りつく　環礁（かんしょう）だ。",
+      "波の記憶を　胸に刻みなさい。",
+    ], flag: "story:reefBeacon", fixedNpc: true },
+    "4,3": { messages: [
+      "潮だまりが　淡く光っている。",
+      "しぶきが　不思議と　疲れを癒やしていく。",
+      "HPが　12　回復した！",
+    ], heal: 12 },
+  },
+  skySanctum: {
+    "4,5": { messages: [
+      "風祠の巫女：「空路を越えて　ここまで来たのですね。",
+      "勇気と準備を　兼ね備えた者にだけ、風は応えます。",
+      "夜明けの洞窟へ向かう前に　この加護を受けなさい。」",
+      "風の加護が　体を包んだ！",
+      "攻撃力が　2　上がった！",
+    ], buff: { type: "attack", val: 2 }, flag: "story:skySanctumCleared", fixedNpc: true },
+    "6,3": { messages: [
+      "雲のしずくが　器に満ちている。",
+      "口に含むと　胸の奥が澄みわたった。",
+      "HPが　18　回復した！",
+    ], heal: 18 },
+  },
 };
 
 const INTERIOR_TREASURES = {
@@ -1791,6 +1924,15 @@ const INTERIOR_TREASURES = {
   },
   underground: {
     "12,8": { id: "underground:12,8", itemId: "mega_potion", amount: 2, messages: ["石の宝箱を　あけた！", "げんきのエリクサ×2を　てにいれた！"] },
+  },
+  shipReef: {
+    "5,6": { id: "shipReef:5,6", gold: 55, messages: ["潮騒の箱を　あけた！", "55ゴールドを　てにいれた！"] },
+    "7,5": { id: "shipReef:7,5", itemId: "potion", amount: 1, messages: ["潮騒の箱を　あけた！", "いやしのしずくを　てにいれた！"] },
+  },
+  skySanctum: {
+    "2,3": { id: "skySanctum:2,3", itemId: "mega_potion", amount: 1, messages: ["雲上の宝箱を　あけた！", "げんきのエリクサを　てにいれた！"] },
+    "2,7": { id: "skySanctum:2,7", gold: 70, messages: ["雲上の宝箱を　あけた！", "70ゴールドを　てにいれた！"] },
+    "8,8": { id: "skySanctum:8,8", itemId: "antidote", amount: 1, messages: ["雲上の宝箱を　あけた！", "どくけしハーブを　てにいれた！"] },
   },
 };
 
@@ -1936,6 +2078,33 @@ const LOCATION_EVENTS = {
     ],
     interior: "catVillage",
   },
+  [`${SPECIAL_POS.shipReef.y},${SPECIAL_POS.shipReef.x}`]: {
+    name: "潮騒の環礁",
+    messages: [
+      "白い飛沫が　輪を描く　小さな環礁。",
+      "船を降りると　潮騒が　やさしく背中を押した。",
+      "はじめて辿りついた海路に　心が少し高鳴る。",
+      "波の導きに　耳をすませながら　奥へ進む……",
+    ],
+    mood: "hope",
+    interior: "shipReef",
+    rewardFlag: "story:reefArrival",
+    requireStoryFlag: "story:shipUnlocked",
+  },
+  [`${SPECIAL_POS.skySanctum.y},${SPECIAL_POS.skySanctum.x}`]: {
+    name: "天空の祠",
+    messages: [
+      "雲を突き抜ける　岩峰の上に　古い祠が眠っている。",
+      "飛行船を降りると　風が　鈴のように鳴った。",
+      "空に選ばれた者だけが　この門をくぐれるという。",
+      "決戦前に　祠の加護を受けられそうだ。",
+      "天空の祠へ　はいる……",
+    ],
+    mood: "hope",
+    interior: "skySanctum",
+    rewardFlag: "story:skyArrival",
+    requireStoryFlag: "story:airshipUnlocked",
+  },
   [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]: {
     name: "海鳴りの船着き場",
     messages: [
@@ -1944,6 +2113,8 @@ const LOCATION_EVENTS = {
       "この船を　託そう。海も川も　渡れるはずだ。」",
       "船を　てにいれた！",
       "海と川を　移動できるようになった！",
+      "船大工：「海の向こうに　3つのしるしが眠ってる。",
+      "波の音と　道しるべを頼りに　探してみな。」",
     ],
     rewardFlag: "story:shipUnlocked",
     requireStoryFlag: "story:royalQuest",
@@ -1955,6 +2126,8 @@ const LOCATION_EVENTS = {
       "整備士：「3つのあかしを　集めたのか。ならば空を託そう。」",
       "飛行船を　てにいれた！",
       "山脈も　海も　越えて進めるようになった！",
+      "整備士：「南東の山脈奥に　封印の洞窟がある。",
+      "空から　夜明けへの道を　見つけてこい。」",
     ],
     rewardFlag: "story:airshipUnlocked",
     requireStoryFlag: "story:shipUnlocked",
@@ -1963,7 +2136,7 @@ const LOCATION_EVENTS = {
   [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: {
     name: "南の祠",
     messages: [
-      "南の橋のほとりに　ひっそりと　建つ　小さな祠。",
+      "山脈の北側に　ひっそりと　建つ　小さな祠。",
       "古びた石造りの　扉が　開いている。",
       "中から　お香の匂いが　漂ってくる……",
       "祠の中へ　はいる……",
@@ -2128,9 +2301,12 @@ function getNextObjective(player) {
   if (!player) return "旅の準備を整える";
   const flags = player.storyFlags || [];
   if (!flags.includes("story:royalQuest")) return "王城で王に会い、使命を受ける";
+  if (!flags.includes("story:shipUnlocked")) return "海鳴りの船着き場で船を受け取り、海路をひらく";
   if (!hasBagItem(player, "manabi_proof")) return "まなびの村で『まなびのあかし』を手に入れる";
   if (!hasBagItem(player, "ancient_key")) return "謎の村の試練を終えて『ふるびたかぎ』を得る";
   if (!hasBagItem(player, "dragon_scale")) return "猫の村で『ドラゴンのウロコ』を得る";
+  if (!flags.includes("story:airshipUnlocked")) return "風読みの飛行船ドックで飛行船を起こす";
+  if (!flags.includes("story:skySanctumCleared")) return "天空の祠で風の加護を受け、決戦の準備を整える";
   if (player.level < 8) return "レベル8以上まで鍛える";
   if (!flags.includes("story:drangoDefeated")) return "くらやみの洞窟最深部でドランゴを倒す";
   if (!flags.includes("story:titleStarlight")) return "はじまりの村の隠し語り部を探す";
