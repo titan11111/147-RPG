@@ -53,3 +53,9 @@ button.btn-pressed {
   filter: brightness(1.08);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
 }
+
+@keyframes miniPlayerPulse {
+  0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+  50%  { transform: translate(-50%,-50%) scale(1.9); opacity: 0.5; }
+  100% { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+}

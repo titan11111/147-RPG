@@ -509,6 +509,7 @@ const NPC_PALETTE = {
     "5,2":  { body:"#94a3b8", hair:"#1e293b" }, // 猫くん（グレー）
     "5,8":  { body:"#bae6fd", hair:"#e0f2fe" }, // 雲まん（空色）
     "8,5":  { body:"#1e293b", hair:"#475569" }, // 忍者（黒）
+    "11,4": { body:"#34d399", hair:"#065f46" }, // 宿屋主人（緑）
   },
   southShrine: {
     "5,5": { body:"#7c3aed", hair:"#fde68a" }, // 占い婆さん（紫・金）
@@ -1170,8 +1171,11 @@ const NAZO_VILLAGE_IMAP = parseIntMap([
   "W..........W",  // row 7
   "W....N.....W",  // row 8: [8,5]=忍者
   "W..........W",  // row 9
-  "W....E.....W",  // row 10: 出口
-  "WWWWWWWWWWWW",  // row 11
+  "WWWW.WWWWWWW",  // row 10: 新しい仕切り（gap col 4）
+  "W.CCNCC....W",  // row 11: 宿屋 [11,4]=宿屋主人 カウンター付き
+  "W..........W",  // row 12
+  "W....E.....W",  // row 13: 出口
+  "WWWWWWWWWWWW",  // row 14
 ]);
 
 // ─── 地下フィールド（ガイア団の地下基地）────────────────────────────────────────
@@ -1198,16 +1202,19 @@ const UNDERGROUND_IMAP = parseIntMap([
 const CAT_VILLAGE_IMAP = parseIntMap([
   "WWWWWWWWWWWW",
   "W..........W",
-  "W.N..N..N..W",
+  "W.N..N..N..W",  // row 2: cats
   "W..........W",
-  "W....F.....W",
+  "W....F.....W",  // row 4: 泉[4,5]
   "W..........W",
-  "WWWWWW.WWWWW",
+  "WWWWWW.WWWWW",  // row 6: 仕切り
   "W..........W",
-  "W..N..N....W",
+  "W..N..N....W",  // row 8: cats
   "W..........W",
-  "W....E.....W",
-  "WWWWWWWWWWWW",
+  "WWWW.WWWWWWW",  // row 10: 新しい仕切り（gap col 4）
+  "W.CCNCC....W",  // row 11: 猫宿屋 [11,4]=宿屋ネコ カウンター付き
+  "W..........W",  // row 12
+  "W....E.....W",  // row 13: 出口
+  "WWWWWWWWWWWW",  // row 14
 ]);
 
 // ─── 職人の村マップ（広めの工房街）──────────────────────────────────────────────
@@ -1534,9 +1541,9 @@ const INTERIOR_EVENTS = {
   },
   artisanVillage: {
     "2,3": { messages: [
-      "鍛冶職人ガンテツ：「刃は　振るう人間の心を映すんだ。",
-      "迷いがある日は　重く、覚悟の日は　軽い。",
-      "必要なら　ここの品を見ていきな。」",
+      "鍛冶職人ガンテツ：「刃は　振るう人間の心を映す。",
+      "迷いがある日は　重く、覚悟の日は　軽い。」",
+      "ガンテツ：「島へ渡るなら　大方効く薬を　工房奥の箱に　しまってあるぞ。」",
     ], shop: true, shopItems: "T2", fixedNpc: true },
     "2,9": { messages: [
       "木工職人ヤチヨ：「橋も机も　一本の木から始まるんだよ。",
@@ -1562,10 +1569,10 @@ const INTERIOR_EVENTS = {
       "君の30分は　君だけのものだ。大事に使いなさい。」",
     ], fixedNpc: true },
     "6,9": { messages: [
-      "工房街の　湧き水だ。",
-      "焼けた喉が　すっと落ち着いた。",
-      "HPが　10　回復した！",
-    ], heal: 10 },
+      "工房街の　宿屋。",
+      "「旅人さん、お疲れ様。　ゆっくり休んでいきな。」",
+      "HPと　MPが　全回復した！",
+    ], heal: 999, inn: true },
   },
   cave: {
     // 最奥の謎の存在（ボス戦トリガー）
@@ -1632,12 +1639,12 @@ const INTERIOR_EVENTS = {
       "だから　きみの　旅は　理科的にも　大事なんだ！",
       "自然を　守ることが　科学の　第一歩だよ。",
     ]},
-    // まなびの村の泉
+    // まなびの村の宿屋（泉の家）
     "5,5": { messages: [
-      "世界の　果ての　泉。",
-      "吸い込まれそうなくらい　澄んでいる。",
-      "HPが　15　回復した！",
-    ], heal: 15 },
+      "世界の　果ての　宿屋。",
+      "「遠くから　よく　来たね。　ゆっくり　休んでいって。」",
+      "HPと　MPが　全回復した！",
+    ], heal: 999, inn: true },
     // 社会先生
     "5,8": { messages: [
       "シャカイ先生：「地図を　見たことがあるか？",
@@ -1728,6 +1735,13 @@ const INTERIOR_EVENTS = {
       "強さとは　目立つことでは　ない。",
       "静かに　在ること——　それが　真の　力だ。",
     ], flag: "ninja" },
+    // 宿屋
+    "11,4": { messages: [
+      "謎の宿屋の主：「……よく　ここまで　来た。",
+      "謎に包まれた宿だが、眠れば　必ず　明日が来る。",
+      "ゆっくり　休んでいきな。",
+      "HPとMPが　全回復した！",
+    ], heal: 999, inn: true, fixedNpc: true },
   },
   catVillage: {
     "2,2": {
@@ -1756,6 +1770,13 @@ const INTERIOR_EVENTS = {
       unlockedMessages: ["子ネコ：「おみやげ　ありがとにゃ！」", "村のみんな、君のこと好きになったにゃ。"],
     },
     "4,5": { messages: ["猫の泉。丸い波紋が静かに広がっている。", "HPが　8　回復した！"], heal: 8 },
+    // 猫宿屋
+    "11,4": {
+      catTalk: true,
+      lockedMessages: ["宿屋ネコ：「にゃー……（眠そう）」", "……ここは　宿屋らしい。"],
+      unlockedMessages: ["宿ネコ：「ようこそ　にゃ。」", "今夜は　ゆっくり　休んでいくにゃ。", "HPとMPが　全回復した！"],
+      heal: 999, inn: true, fixedNpc: true,
+    },
   },
   // ─── 地下フィールド（ガイア団基地）────────────────────────────────────────
   underground: {
@@ -1794,7 +1815,7 @@ const INTERIOR_EVENTS = {
       "最奥で　ドランゴの　意識体に　触れることが　できる。",
       "……頼んだぞ。地上の　光を　取り戻してくれ。",
       "これを　持っていけ。　地底の　加護を　授けよう。",
-      "HPが　全回復した！",
+      "HPと　MPが　全回復した！",
     ], heal: 999 },
   },
   school: {
@@ -1896,11 +1917,13 @@ const INTERIOR_EVENTS = {
     "2,5": { messages: [
       "潮騒の精：「ようこそ、旅人。",
       "ここは　船乗りだけが　辿りつく　環礁（かんしょう）だ。",
+      "しぶきに　触れると　魔力まで　洗われるという……記憶だけでも　持ち帰りなさい。」",
       "波の記憶を　胸に刻みなさい。",
     ], flag: "story:reefBeacon", fixedNpc: true },
     "4,3": { messages: [
       "潮だまりが　淡く光っている。",
       "しぶきが　不思議と　疲れを癒やしていく。",
+      "胸の奥が　すっと軽くなった気がする……（HP回復のちからだ）。",
       "HPが　12　回復した！",
     ], heal: 12 },
   },
@@ -2002,6 +2025,7 @@ const LOCATION_EVENTS = {
       "金属と木の香りが　風に混じる。",
       "ここは　いろんな職人が　腕を磨く　工房の村。",
       "叩く音、削る音、織る音が　重なっている。",
+      "鍛冶長が　試し刃や珍品を　預かっているという。",
       "職人の村へ　はいる……",
     ],
     interior: "artisanVillage",
@@ -2158,6 +2182,7 @@ const LOCATION_EVENTS = {
     messages: [
       "もうもうと　湯気が　立ち上っている。",
       "雪に囲まれた　露天温泉だ。",
+      "昔話では　湯と地の底の泉が　魔力までゆるめるという……",
       "足を　踏み入れると……",
       "──　底が　ぬけた！",
       "……どこかへ　落ちていく……",
@@ -2176,7 +2201,7 @@ SAVE_POINT_POS.forEach((point) => {
 });
 
 // ─── ENEMIES ──────────────────────────────────────────────────────────────────
-// 戦闘の敵スプライト: `images/enemy-{id}.png`（id は下表 0〜39）。タイトル等には使わない。欠落時は EnemySprite がベクターへフォールバック。
+// 戦闘の敵スプライト: `images/enemy-{id}.png`（欠落時は EnemySprite がベクターへフォールバック）。
 // magic: { name, type:"dmg"|"heal", power } / drop: { id:"herb"|"potion", rate }
 const ENEMIES = [
   // ─ Tier1: 初心者 (dist < 14, Lv1-2) ─
@@ -2223,6 +2248,8 @@ const ENEMIES = [
   // ─ 深部ゾーン (dist > 30, Lv10+) ─
   { id:36,  name:"ダークナイト",   hp:65, atk:23, def:10, exp:48, gold:30 },
   { id:37,  name:"あんこくまじゅつし",hp:55, atk:22, def: 8, exp:45, gold:28, magic:{ name:"じごくのほのお",type:"dmg", power:18 }, drop:{ id:"potion", rate:0.25 } },
+  { id:41,  name:"ゾンビドラゴン", hp:72, atk:21, def: 9, exp:52, gold:32, poison:true, poisonRate:0.18, magic:{ name:"ふんさいクロウ", type:"dmg", power:15 } },
+  { id:42,  name:"邪竜のつかい",   hp:58, atk:22, def: 7, exp:50, gold:30, magic:{ name:"じゃりゅうびれ", type:"dmg", power:17 } },
   // ─ ボス (洞窟のみ) ─
   { id:38,  name:"ドランゴ",       hp:200, atk:24, def:10, exp:75, gold:50, formImageFile:"enemy-38.png", magic:[
     { name:"ファイアートランスフォーメーション", type:"dmg", power:18, transformFile:"enemy-38.png", transformLabel:"炎竜形態" },
@@ -2307,14 +2334,28 @@ function getMainProgress(player) {
   };
 }
 
+const KEY_ITEM_QUEST_ENTRIES = [
+  { id: "manabi_proof", shortName: "まなびのあかし", hint: "まなびの村" },
+  { id: "ancient_key", shortName: "ふるびたかぎ", hint: "謎の村の試練" },
+  { id: "dragon_scale", shortName: "ドラゴンのウロコ", hint: "猫の村" },
+];
+
 function getNextObjective(player) {
   if (!player) return "旅の準備を整える";
   const flags = player.storyFlags || [];
   if (!flags.includes("story:royalQuest")) return "王城で王に会い、使命を受ける";
   if (!flags.includes("story:shipUnlocked")) return "海鳴りの船着き場で船を受け取り、海路をひらく";
-  if (!hasBagItem(player, "manabi_proof")) return "まなびの村で『まなびのあかし』を手に入れる";
-  if (!hasBagItem(player, "ancient_key")) return "謎の村の試練を終えて『ふるびたかぎ』を得る";
-  if (!hasBagItem(player, "dragon_scale")) return "猫の村で『ドラゴンのウロコ』を得る";
+  const missingKeys = KEY_ITEM_QUEST_ENTRIES.filter((k) => !hasBagItem(player, k.id));
+  if (missingKeys.length === 3) {
+    return "海の先の3つの島で『あかし』を集める（どの島からでもよい）";
+  }
+  if (missingKeys.length === 2) {
+    return `『あかし』あと2つ：${missingKeys.map((k) => k.shortName).join("・")}`;
+  }
+  if (missingKeys.length === 1) {
+    const k = missingKeys[0];
+    return `『あかし』あと1つ：${k.shortName}（${k.hint}）`;
+  }
   if (!flags.includes("story:airshipUnlocked")) return "風読みの飛行船ドックで飛行船を起こす";
   if (!flags.includes("story:skySanctumCleared")) return "天空の祠で風の加護を受け、決戦の準備を整える";
   if (player.level < 8) return "レベル8以上まで鍛える";
@@ -2342,7 +2383,16 @@ const wrapCoord = (v, size) => ((v % size) + size) % size;
 // Zone C  dist 13〜19  : Lv2〜4    タヌキ・どくいもむし・ゴースト（町〜学校）
 // Zone D  dist 20〜25  : Lv4〜6    おばけきのこ・ゴブリン・アイスインプ（学校〜家）
 // Zone E  dist 26〜31  : Lv6〜9    ツチモグラ・まどうし・ドクロナイト（家〜洞窟）
-// Zone F  dist 32+     : Lv9+      ダークナイト・あんこくまじゅつし（洞窟深部）
+// Zone F  dist 32+     : Lv9+      深部枠＋前哨系（ゾンビドラゴン等）・メタにゃん稀
+/** マンハッタン距離 zoneE より奥のエンカウント（昼夜共通でプールを共有） */
+function pickDeepZoneEnemy(isNight) {
+  if (rng(1, 18) === 1) return E(40);
+  const pool = isNight
+    ? [E(36), E(36), E(37), E(37), E(41), E(42), E(35), E(31), E(13)]
+    : [E(36), E(36), E(37), E(37), E(41), E(42), E(35), E(31)];
+  return pool[rng(0, pool.length - 1)];
+}
+
 function getEnemyForZone(tile, pos, isNight = false) {
   const zoneA = Math.round(5 * WORLD_SCALE);
   const zoneB = Math.round(12 * WORLD_SCALE);
@@ -2391,9 +2441,8 @@ function getEnemyForZone(tile, pos, isNight = false) {
     if (dist <= zoneB) return [E(4),  E(7),  E(2),  E(6) ][rng(0, 3)];
     if (dist <= zoneC) return [E(6),  E(7),  E(9),  E(13)][rng(0, 3)];
     if (dist <= zoneD) return [E(12), E(13), E(11), E(14)][rng(0, 3)];
-    if (dist <= zoneE) return [E(12), E(13), E(35), E(36)][rng(0, 3)];
-    if (rng(1, 18) === 1) return E(40);
-    return [E(36), E(37)][rng(0, 1)];
+    if (dist <= zoneE) return [E(12), E(13), E(35), E(36), E(41)][rng(0, 4)];
+    return pickDeepZoneEnemy(true);
   }
   // Zone A: スタート直後の超安全地帯（魔法なし・物理のみ）
   if (dist <= zoneA) return [E(1), E(5)][rng(0, 1)];
@@ -2405,14 +2454,13 @@ function getEnemyForZone(tile, pos, isNight = false) {
   if (dist <= zoneD) return [E(8), E(9), E(14), E(15)][rng(0, 3)];
   // Zone E: 家〜洞窟（中堅後半）
   if (dist <= zoneE) return [E(10), E(11), E(12), E(13)][rng(0, 3)];
-  // Zone F: 洞窟深部でのみメタにゃん 1/18
-  if (rng(1, 18) === 1) return E(40);
-  return [E(36), E(37)][rng(0, 1)];
+  // Zone F: 洞窟深部〜（メタにゃんは pickDeepZoneEnemy 内の確率）
+  return pickDeepZoneEnemy(false);
 }
 
 // 属性呪文の弱点（敵ID）。小さな固定ボーナスのみ（全体バランスを崩さない）
 const ELEMENT_SPELL_WEAK = {
-  fire:    [14, 19, 22, 29],
+  fire:    [14, 19, 22, 29, 41],
   water:   [11, 33, 34],
   thunder: [12, 24, 25, 27, 28],
 };
@@ -2454,6 +2502,11 @@ const SPELLS = [
   { name: "せんにんのかぜ", mp: 6, effect: "wind",  power: 22, msg: "仙人の風が吹き荒れる！", secret: true, minLevel: 10 },
 ];
 
+/** ゆめしずく無効（ボス・特定エリート）。id 追加時はここを見る */
+function isEnemyImmuneToSleep(enemyId) {
+  return enemyId === 38 || enemyId === 39 || enemyId === 40 || enemyId === 41 || enemyId === 42;
+}
+
 function getUnlockedSpells(player) {
   const level = Number(player?.level || 1);
   const hasSecret = !!player?.nazoSpellLearned;
@@ -2484,7 +2537,7 @@ function getEnemyRecommendedLevel(enemyId) {
   if (enemyId <= 23) return 5 + ((enemyId - 16) >= 4 ? 2 : 1); // 6-7
   if (enemyId <= 29) return 8 + ((enemyId - 24) >= 3 ? 2 : 1); // 9-10
   if (enemyId <= 35) return 7 + ((enemyId - 30) >= 3 ? 2 : 1); // 8-9
-  if (enemyId <= 37) return 11;
+  if (enemyId <= 42) return 11;
   return 5;
 }
 
@@ -2494,7 +2547,7 @@ function getEnemyRecommendationRows() {
     { label: "Lv3-4", ids: [8, 9, 10, 11, 12, 13, 14, 15] },
     { label: "Lv6-7", ids: [16, 17, 18, 19, 20, 21, 22, 23, 39] },
     { label: "Lv8-10", ids: [30, 31, 32, 33, 34, 35, 24, 25, 26, 27, 28, 29] },
-    { label: "Lv11+", ids: [36, 37, 40] },
+    { label: "Lv11+", ids: [36, 37, 40, 41, 42] },
     { label: "ボス", ids: [38] },
   ];
   return rows.map((row) => ({

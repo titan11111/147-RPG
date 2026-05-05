@@ -61,32 +61,49 @@ function MiniMap({
         ctx.fillRect(px - dot * 0.2, py - dot * 0.2, dot, dot);
       }
     });
-    // プレイヤー位置
-    const pp = Math.max(2, tilePx * 1.4);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
   }, [player.pos.x, player.pos.y, player.visited?.size, mapSize]);
-  return /*#__PURE__*/React.createElement("canvas", {
-    ref: canvasRef,
-    width: mapSize,
-    height: mapSize,
+  const dotL = `${(player.pos.x / MAP_SIZE * 100).toFixed(1)}%`;
+  const dotT = `${(player.pos.y / MAP_SIZE * 100).toFixed(1)}%`;
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       top: 4,
       right: 4,
       width: viewSize,
       height: viewSize,
-      imageRendering: "pixelated",
       border: "1px solid #888",
       borderRadius: 2,
+      overflow: "hidden",
       opacity: 0.92,
       background: "#111",
       ...style
     }
-  });
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef,
+    width: mapSize,
+    height: mapSize,
+    style: {
+      width: "100%",
+      height: "100%",
+      imageRendering: "pixelated",
+      display: "block"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: dotL,
+      top: dotT,
+      transform: "translate(-50%,-50%)",
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: "#ff1a1a",
+      boxShadow: "0 0 6px #ff0000, 0 0 16px #ff4400, 0 0 28px #ff2200",
+      animation: "miniPlayerPulse 0.9s ease-in-out infinite",
+      pointerEvents: "none",
+      zIndex: 2
+    }
+  }));
 }
 
 // ─── HERO SPRITE (Canvas shapes) ─────────────────────────────────────────────
@@ -2711,6 +2728,7 @@ function TitleScreen({
           from { left: -60%; }
           to   { left: 160%; }
         }
+
       `));
 }
 function NameInput({
@@ -3184,7 +3202,9 @@ function MapScreen({
     className: `border p-2 text-xs text-center ${canInvestigate ? "border-yellow-500 text-yellow-200" : "border-gray-700 text-gray-300"}`
   }, signData ? `道しるべ ${signData.arrow} ${signData.name}` : event ? `現在地 ${event.name}` : `現在地 ${tileName[currentTile]} (${pos.x},${pos.y})`, /*#__PURE__*/React.createElement("div", {
     className: "mt-1 text-[10px] text-cyan-300"
-  }, "\u6B21\u306E\u76EE\u7684\uFF1A", objective), (player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && /*#__PURE__*/React.createElement("div", {
+  }, "\u6B21\u306E\u76EE\u7684\uFF1A", objective), player.level >= 2 && /*#__PURE__*/React.createElement("div", {
+    className: "mt-0.5 text-[9px] text-blue-200/90 leading-snug"
+  }, "MP\u306F\u3000\u5BBF\u30FB\u4E00\u90E8\u306E\u6CC9\u30FB\u30EC\u30D9\u30EB\u30A2\u30C3\u30D7\u3067\u3000\u304B\u3044\u3075\u304F"), (player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && /*#__PURE__*/React.createElement("div", {
     className: "mt-1 text-[10px] text-yellow-300"
   }, "\uD83D\uDC31 \u732B\u306E\u3068\u3082\u3060\u3061\u304C\u3000\u3064\u3044\u3066\u304D\u3066\u3044\u308B\u3000\u306B\u3083")), /*#__PURE__*/React.createElement("div", {
     className: `mt-1 border-2 border-zinc-500 bg-zinc-800 rounded-md ${compactLayout ? "p-2" : "p-3"} shadow-[inset_0_2px_0_rgba(255,255,255,0.25)]`,
@@ -3844,6 +3864,7 @@ function InteriorMapScreen({
       key: `${y}-${x}`,
       className: "flex items-center justify-center",
       style: {
+        position: "relative",
         width: TS,
         height: TS,
         background: tileStyle[displayTile] ?? "#333",
@@ -3906,7 +3927,22 @@ function InteriorMapScreen({
     }) : tile === INT.STAIRS_UP ? /*#__PURE__*/React.createElement(InteriorTileIcon, {
       kind: "stairsUp",
       size: TS - 4
-    }) : null);
+    }) : null, events[key]?.inn && !isPlayer && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 1,
+        right: 1,
+        fontSize: 6,
+        lineHeight: "9px",
+        background: "#92400e",
+        color: "#fef9c3",
+        borderRadius: 1,
+        padding: "0 1px",
+        fontWeight: "bold",
+        zIndex: 3,
+        pointerEvents: "none"
+      }
+    }, "\u5BBF"));
   }))), isDungeon && /*#__PURE__*/React.createElement(CaveDarkness, {
     intPos: intPos,
     TS: TS,
@@ -4345,8 +4381,8 @@ function BattleScreen({
         addLog("闇の集束を　吹き飛ばした！");
       }
     } else if (spell.effect === "sleep") {
-      if (enemy.id === 38) {
-        addLog(`${spell.name}！　ドランゴには　きかなかった！`);
+      if (isEnemyImmuneToSleep(enemy.id)) {
+        addLog(`${spell.name}！　${enemy.name}には　きかなかった！`);
       } else {
         setSleeping(true);
         addLog(`${spell.name}！ ${enemy.name}は　ねむった！`);
@@ -4502,7 +4538,9 @@ function BattleScreen({
     className: "flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-center text-blue-300"
-  }, "\u2500\u2500 \u3058\u3085\u3082\u3093\u3092\u3000\u3048\u3089\u3079 \u2500\u2500"), availableSpells.length === 0 && /*#__PURE__*/React.createElement("p", {
+  }, "\u2500\u2500 \u3058\u3085\u3082\u3093\u3092\u3000\u3048\u3089\u3079 \u2500\u2500"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-center text-gray-500 leading-snug px-1"
+  }, "MP\u304C\u3078\u3063\u305F\u3089\u3000\u6751\u3084\u8857\u306E\u5BBF\u30FB\u30BB\u30FC\u30D6\u5730\u70B9\u30FB\u30EC\u30D9\u30EB\u30A2\u30C3\u30D7\u3067\u3000\u3068\u3068\u306E\u3046\u3088"), availableSpells.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-center text-gray-500"
   }, "\u307E\u3060\u3000\u304A\u307C\u3048\u305F\u3000\u3058\u3085\u3082\u3093\u304C\u3000\u306A\u3044\uFF01"), availableSpells.map(s => /*#__PURE__*/React.createElement("button", {
     key: s.name,
@@ -4609,7 +4647,9 @@ function InfoOverlay({
     style: {
       fontFamily: "'Courier New',monospace"
     }
-  }, /*#__PURE__*/React.createElement("p", null, "\u306A\u307E\u3048 \uFF1A", player.name, "\uFF08", player.gender === "male" ? "男の子" : "女の子", "\uFF09"), /*#__PURE__*/React.createElement("p", null, "\u30EC\u30D9\u30EB \uFF1A", player.level, "\u3000\u3000EXP\uFF1A", player.exp), /*#__PURE__*/React.createElement("p", null, "HP     \uFF1A", player.hp, " / ", player.maxHp), /*#__PURE__*/React.createElement("p", null, "MP     \uFF1A", player.mp, " / ", player.maxMp), /*#__PURE__*/React.createElement("p", null, "\u3053\u3046\u3052\u304D\uFF1A", player.atk, "\u3000\u3000\u307E\u3082\u308A\uFF1A", player.def), /*#__PURE__*/React.createElement("p", null, "\u30B4\u30FC\u30EB\u30C9\uFF1A", player.gold, "G"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("p", null, "\u306A\u307E\u3048 \uFF1A", player.name, "\uFF08", player.gender === "male" ? "男の子" : "女の子", "\uFF09"), /*#__PURE__*/React.createElement("p", null, "\u30EC\u30D9\u30EB \uFF1A", player.level, "\u3000\u3000EXP\uFF1A", player.exp), /*#__PURE__*/React.createElement("p", null, "HP     \uFF1A", player.hp, " / ", player.maxHp), /*#__PURE__*/React.createElement("p", null, "MP     \uFF1A", player.mp, " / ", player.maxMp), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-blue-200 leading-snug"
+  }, "MP\u306E\u304B\u3044\u3075\u304F\uFF1A\u5BBF\u5C4B\uFF08HP\u3068\u540C\u6642\u306B\u5168\u5FEB\uFF09\uFF0F\u30BB\u30FC\u30D6\u5730\u70B9\u306E\u6CC9\u306A\u3069\uFF0F\u30EC\u30D9\u30EB\u30A2\u30C3\u30D7\u3002\u3069\u3046\u3050\u306F\u4E3B\u306BHP\u5411\u3051\u3002"), /*#__PURE__*/React.createElement("p", null, "\u3053\u3046\u3052\u304D\uFF1A", player.atk, "\u3000\u3000\u307E\u3082\u308A\uFF1A", player.def), /*#__PURE__*/React.createElement("p", null, "\u30B4\u30FC\u30EB\u30C9\uFF1A", player.gold, "G"), /*#__PURE__*/React.createElement("div", {
     className: "border-t border-gray-700 mt-2 pt-2 space-y-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-cyan-300"

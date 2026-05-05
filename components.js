@@ -45,20 +45,27 @@ function MiniMap({ player, mapSize = MINI_SIZE, viewSize = 78, style = {} }) {
         ctx.fillRect(px - dot * 0.2, py - dot * 0.2, dot, dot);
       }
     });
-    // プレイヤー位置
-    const pp = Math.max(2, tilePx * 1.4);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
   }, [player.pos.x, player.pos.y, player.visited?.size, mapSize]);
 
+  const dotL = `${(player.pos.x / MAP_SIZE * 100).toFixed(1)}%`;
+  const dotT = `${(player.pos.y / MAP_SIZE * 100).toFixed(1)}%`;
   return (
-    <canvas ref={canvasRef} width={mapSize} height={mapSize}
-      style={{ position:"absolute", top:4, right:4, width:viewSize, height:viewSize,
-               imageRendering:"pixelated", border:"1px solid #888",
-               borderRadius:2, opacity:0.92, background:"#111", ...style }} />
+    <div style={{ position:"absolute", top:4, right:4, width:viewSize, height:viewSize,
+                  border:"1px solid #888", borderRadius:2, overflow:"hidden",
+                  opacity:0.92, background:"#111", ...style }}>
+      <canvas ref={canvasRef} width={mapSize} height={mapSize}
+        style={{ width:"100%", height:"100%", imageRendering:"pixelated", display:"block" }} />
+      <div style={{
+        position:"absolute", left:dotL, top:dotT,
+        transform:"translate(-50%,-50%)",
+        width:8, height:8, borderRadius:"50%",
+        background:"#ff1a1a",
+        boxShadow:"0 0 6px #ff0000, 0 0 16px #ff4400, 0 0 28px #ff2200",
+        animation:"miniPlayerPulse 0.9s ease-in-out infinite",
+        pointerEvents:"none",
+        zIndex:2,
+      }} />
+    </div>
   );
 }
 
@@ -2254,6 +2261,7 @@ function TitleScreen({ onStart, hasSave, onContinue }) {
           from { left: -60%; }
           to   { left: 160%; }
         }
+
       `}</style>
     </div>
   );
@@ -2647,6 +2655,9 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, timeOfD
           : event ? `現在地 ${event.name}`
           : `現在地 ${tileName[currentTile]} (${pos.x},${pos.y})`}
         <div className="mt-1 text-[10px] text-cyan-300">次の目的：{objective}</div>
+        {player.level >= 2 && (
+          <div className="mt-0.5 text-[9px] text-blue-200/90 leading-snug">MPは　宿・一部の泉・レベルアップで　かいふく</div>
+        )}
         {(player.bag || []).some(i => i.id === "dragon_scale" && i.count > 0) && (
           <div className="mt-1 text-[10px] text-yellow-300">🐱 猫のともだちが　ついてきている　にゃ</div>
         )}
@@ -3211,6 +3222,7 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
                 key={`${y}-${x}`}
                 className="flex items-center justify-center"
                 style={{
+                  position: "relative",
                   width: TS,
                   height: TS,
                   background: tileStyle[displayTile] ?? "#333",
@@ -3259,6 +3271,15 @@ function InteriorMapScreen({ interiorType, player, onHeal, onBuff, onExit, onInf
                                     : tile === INT.STAIRS_UP
                                       ? <InteriorTileIcon kind="stairsUp" size={TS - 4} />
                                   : null}
+                {events[key]?.inn && !isPlayer && (
+                  <div style={{
+                    position: "absolute", top: 1, right: 1,
+                    fontSize: 6, lineHeight: "9px",
+                    background: "#92400e", color: "#fef9c3",
+                    borderRadius: 1, padding: "0 1px",
+                    fontWeight: "bold", zIndex: 3, pointerEvents: "none",
+                  }}>宿</div>
+                )}
               </div>
             );
           }))}
@@ -3600,8 +3621,8 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
         addLog("闇の集束を　吹き飛ばした！");
       }
     } else if (spell.effect === "sleep") {
-      if (enemy.id === 38) {
-        addLog(`${spell.name}！　ドランゴには　きかなかった！`);
+      if (isEnemyImmuneToSleep(enemy.id)) {
+        addLog(`${spell.name}！　${enemy.name}には　きかなかった！`);
       } else {
         setSleeping(true);
         addLog(`${spell.name}！ ${enemy.name}は　ねむった！`);
@@ -3725,6 +3746,9 @@ function BattleScreen({ player, enemy: initEnemy, isBoss, onWin, onLose, onFlee,
       {phase === "spell" && (
         <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-1">
           <p className="text-xs text-center text-blue-300">── じゅもんを　えらべ ──</p>
+          <p className="text-[10px] text-center text-gray-500 leading-snug px-1">
+            MPがへったら　村や街の宿・セーブ地点・レベルアップで　ととのうよ
+          </p>
           {availableSpells.length === 0 && (
             <p className="text-xs text-center text-gray-500">まだ　おぼえた　じゅもんが　ない！</p>
           )}
@@ -3815,6 +3839,9 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
         <p>レベル ：{player.level}　　EXP：{player.exp}</p>
         <p>HP     ：{player.hp} / {player.maxHp}</p>
         <p>MP     ：{player.mp} / {player.maxMp}</p>
+        <p className="text-[10px] text-blue-200 leading-snug">
+          MPのかいふく：宿屋（HPと同時に全快）／セーブ地点の泉など／レベルアップ。どうぐは主にHP向け。
+        </p>
         <p>こうげき：{player.atk}　　まもり：{player.def}</p>
         <p>ゴールド：{player.gold}G</p>
         <div className="border-t border-gray-700 mt-2 pt-2 space-y-1">
