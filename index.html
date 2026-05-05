@@ -12,7 +12,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="./vendor/react.production.min.js"></script>
   <script src="./vendor/react-dom.production.min.js"></script>
-  <script src="./vendor/babel.min.js"></script>
   <script>
     (function () {
       function showFatal(msg) {
@@ -43,8 +42,8 @@
 </head>
 <body>
   <div id="app"></div>
-  <script type="text/babel" data-presets="typescript,react" src="./core.js"></script>
-  <script type="text/babel" data-presets="typescript,react" src="./components.js"></script>
-  <script type="text/babel" data-presets="typescript,react" src="./app.js"></script>
+  <script src="./core.compiled.js"></script>
+  <script src="./components.compiled.js"></script>
+  <script src="./app.compiled.js"></script>
 </body>
 </html>

@@ -29,6 +29,10 @@ body {
   height: 100%;
 }
 
+/* じょうほうオーバーレイ：iOS で慣性スクロールを効かせる */
+.info-overlay-scroll {
+  -webkit-overflow-scrolling: touch;
+}
 /* iOS Safari: dvh 非対応 (iOS < 15.4) 向けフォールバック */
 .game-frame {
   height: 100vh;        /* iOS 15.4未満 / 旧ブラウザ用 */

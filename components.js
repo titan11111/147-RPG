@@ -25,13 +25,25 @@ function MiniMap({ player, mapSize = MINI_SIZE, viewSize = 78, style = {} }) {
         ctx.fillRect(px, py, tilePx + 0.2, tilePx + 0.2);
       }
     }
-    // 特殊地点（視認性のため少し大きめに描画）
+    // 特殊地点（金ドット → 訪問済みは青丸に変化）
+    const visited = player.visited instanceof Set ? player.visited : new Set(player.visited || []);
     Object.values(SPECIAL_POS).forEach(({ x, y }) => {
       const px = x * tilePx;
       const py = y * tilePx;
       const dot = Math.max(1.5, tilePx * 1.25);
-      ctx.fillStyle = "#ffd700";
-      ctx.fillRect(px - dot * 0.2, py - dot * 0.2, dot, dot);
+      const wasVisited = visited.has(`${y},${x}`);
+      if (wasVisited) {
+        ctx.fillStyle = "#3b82f6";
+        ctx.beginPath();
+        ctx.arc(px + dot * 0.3, py + dot * 0.3, dot * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#93c5fd";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = "#ffd700";
+        ctx.fillRect(px - dot * 0.2, py - dot * 0.2, dot, dot);
+      }
     });
     // プレイヤー位置
     const pp = Math.max(2, tilePx * 1.4);
@@ -40,7 +52,7 @@ function MiniMap({ player, mapSize = MINI_SIZE, viewSize = 78, style = {} }) {
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 1;
     ctx.strokeRect(player.pos.x * tilePx - pp * 0.25, player.pos.y * tilePx - pp * 0.25, pp, pp);
-  }, [player.pos.x, player.pos.y, mapSize]);
+  }, [player.pos.x, player.pos.y, player.visited?.size, mapSize]);
 
   return (
     <canvas ref={canvasRef} width={mapSize} height={mapSize}
@@ -119,6 +131,30 @@ function HeroSprite({ gender, direction = "down", animStep = 0, size = 30 }) {
 
   return <canvas ref={canvasRef} width={size} height={size}
            style={{ imageRendering:"pixelated", display:"block" }} />;
+}
+
+// ─── VEHICLE SPRITE (船 / 飛空艇) ────────────────────────────────────────────
+function VehicleSprite({ type, direction = "down", size = 30 }) {
+  const imgs = {
+    ship: {
+      right: "./船東向き.png",
+      left:  "./船西向き.png",
+      up:    "./船北向き.png",
+      down:  "./船南向き.png",
+    },
+    airship: {
+      right: "./宇宙船東むき.png",
+      left:  "./宇宙船西向き.png",
+      up:    "./宇宙船北向き.png",
+      down:  "./宇宙船南向き.png",
+    },
+  };
+  const src = (imgs[type] ?? imgs.ship)[direction] ?? (imgs[type] ?? imgs.ship).down;
+  return (
+    <img src={src} alt={type}
+      style={{ width: size, height: size, imageRendering: "pixelated", objectFit: "contain", display: "block" }}
+    />
+  );
 }
 
 // ─── NPC SPRITE (Canvas shapes) ──────────────────────────────────────────────
@@ -1148,6 +1184,7 @@ function WorldLandmarkIcon({ kind, size = 24 }) {
     const centerX = s / 2;
     const centerY = s / 2;
 
+    // ── 橋 ──────────────────────────────────────────────────────────
     if (kind === "bridge") {
       ctx.fillStyle = "#6b4f33";
       ctx.fillRect(s * 0.1, s * 0.52, s * 0.8, s * 0.2);
@@ -1155,64 +1192,267 @@ function WorldLandmarkIcon({ kind, size = 24 }) {
       ctx.lineWidth = 1;
       for (let i = 0; i < 4; i++) {
         const x = s * (0.18 + i * 0.18);
-        ctx.beginPath();
-        ctx.moveTo(x, s * 0.52);
-        ctx.lineTo(x, s * 0.72);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, s * 0.52); ctx.lineTo(x, s * 0.72); ctx.stroke();
       }
       return;
     }
 
+    // ── 洞窟 ─────────────────────────────────────────────────────────
     if (kind === "cave") {
+      ctx.fillStyle = "#374151";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.12, s * 0.82);
+      ctx.lineTo(s * 0.5, s * 0.22);
+      ctx.lineTo(s * 0.88, s * 0.82);
+      ctx.closePath(); ctx.fill();
       ctx.fillStyle = "#111827";
       ctx.beginPath();
-      ctx.ellipse(centerX, s * 0.62, s * 0.34, s * 0.25, 0, 0, Math.PI * 2);
+      ctx.ellipse(centerX, s * 0.72, s * 0.2, s * 0.15, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#0b0f17";
       ctx.beginPath();
-      ctx.ellipse(centerX, s * 0.62, s * 0.2, s * 0.14, 0, 0, Math.PI * 2);
+      ctx.ellipse(centerX, s * 0.72, s * 0.11, s * 0.08, 0, 0, Math.PI * 2);
       ctx.fill();
       return;
     }
 
-    // house/school/town variants
+    // ── 王城 ─────────────────────────────────────────────────────────
+    if (kind === "castle") {
+      ctx.fillStyle = "#6b7280";
+      ctx.fillRect(s * 0.06, s * 0.28, s * 0.88, s * 0.52);
+      // 左塔
+      ctx.fillStyle = "#4b5563";
+      ctx.fillRect(s * 0.06, s * 0.18, s * 0.22, s * 0.62);
+      // 右塔
+      ctx.fillRect(s * 0.72, s * 0.18, s * 0.22, s * 0.62);
+      // 中央本棟（高い）
+      ctx.fillStyle = "#6b7280";
+      ctx.fillRect(s * 0.30, s * 0.22, s * 0.40, s * 0.58);
+      // 屋根（三角）中央
+      ctx.fillStyle = "#7f1d1d";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.28, s * 0.22); ctx.lineTo(s * 0.5, s * 0.06); ctx.lineTo(s * 0.72, s * 0.22);
+      ctx.closePath(); ctx.fill();
+      // 城壁の凹凸（銃眼）
+      ctx.fillStyle = "#4b5563";
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(s * (0.08 + i * 0.08), s * 0.18, s * 0.05, s * 0.08);
+      }
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(s * (0.74 + i * 0.08), s * 0.18, s * 0.05, s * 0.08);
+      }
+      // 門
+      ctx.fillStyle = "#1f2937";
+      ctx.beginPath();
+      ctx.arc(centerX, s * 0.72, s * 0.12, Math.PI, 0);
+      ctx.fillRect(centerX - s * 0.12, s * 0.60, s * 0.24, s * 0.20);
+      ctx.fill();
+      // 旗
+      ctx.strokeStyle = "#d1d5db";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(s * 0.5, s * 0.06); ctx.lineTo(s * 0.5, s * 0.01); ctx.stroke();
+      ctx.fillStyle = "#fca5a5";
+      ctx.fillRect(s * 0.5, s * 0.01, s * 0.1, s * 0.05);
+      return;
+    }
+
+    // ── 城下町（大きな街） ────────────────────────────────────────────
+    if (kind === "castleTown") {
+      // 複数の建物シルエット
+      ctx.fillStyle = "#b45309";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.04, s * 0.48); ctx.lineTo(s * 0.22, s * 0.28); ctx.lineTo(s * 0.40, s * 0.48);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#92400e";
+      ctx.fillRect(s * 0.10, s * 0.48, s * 0.24, s * 0.32);
+      ctx.fillStyle = "#7f1d1d";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.38, s * 0.44); ctx.lineTo(s * 0.58, s * 0.20); ctx.lineTo(s * 0.78, s * 0.44);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#991b1b";
+      ctx.fillRect(s * 0.44, s * 0.44, s * 0.28, s * 0.36);
+      ctx.fillStyle = "#b45309";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.68, s * 0.50); ctx.lineTo(s * 0.84, s * 0.34); ctx.lineTo(s * 1.0, s * 0.50);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#92400e";
+      ctx.fillRect(s * 0.74, s * 0.50, s * 0.22, s * 0.30);
+      // 窓
+      ctx.fillStyle = "#fde68a";
+      ctx.fillRect(s * 0.14, s * 0.54, s * 0.07, s * 0.07);
+      ctx.fillRect(s * 0.24, s * 0.54, s * 0.07, s * 0.07);
+      ctx.fillRect(s * 0.49, s * 0.50, s * 0.07, s * 0.07);
+      ctx.fillRect(s * 0.62, s * 0.50, s * 0.07, s * 0.07);
+      return;
+    }
+
+    // ── 温泉 ─────────────────────────────────────────────────────────
+    if (kind === "onsen") {
+      ctx.fillStyle = "#0891b2";
+      ctx.beginPath();
+      ctx.ellipse(centerX, s * 0.68, s * 0.36, s * 0.20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#67e8f9";
+      ctx.beginPath();
+      ctx.ellipse(centerX, s * 0.66, s * 0.28, s * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 湯気
+      ctx.strokeStyle = "#e0f2fe";
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
+      [[0.38, 0.48, 0.36, 0.30], [0.50, 0.44, 0.48, 0.26], [0.62, 0.48, 0.60, 0.30]].forEach(([x1, y1, x2, y2]) => {
+        ctx.beginPath();
+        ctx.moveTo(s * x1, s * y1);
+        ctx.bezierCurveTo(s * (x1 - 0.06), s * ((y1 + y2) / 2), s * (x1 + 0.06), s * ((y1 + y2) / 2), s * x2, s * y2);
+        ctx.stroke();
+      });
+      return;
+    }
+
+    // ── 船着き場 ──────────────────────────────────────────────────────
+    if (kind === "shipyard") {
+      // 桟橋
+      ctx.fillStyle = "#78350f";
+      ctx.fillRect(s * 0.40, s * 0.44, s * 0.20, s * 0.44);
+      ctx.fillRect(s * 0.18, s * 0.62, s * 0.64, s * 0.10);
+      ctx.fillRect(s * 0.18, s * 0.74, s * 0.64, s * 0.06);
+      // 水
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillRect(s * 0.06, s * 0.78, s * 0.88, s * 0.14);
+      // 小屋（屋根）
+      ctx.fillStyle = "#b45309";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.22, s * 0.44); ctx.lineTo(s * 0.5, s * 0.20); ctx.lineTo(s * 0.78, s * 0.44);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#fef3c7";
+      ctx.fillRect(s * 0.30, s * 0.44, s * 0.40, s * 0.22);
+      // 旗（青）
+      ctx.strokeStyle = "#6b7280";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(s * 0.72, s * 0.44); ctx.lineTo(s * 0.72, s * 0.20); ctx.stroke();
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(s * 0.72, s * 0.20, s * 0.10, s * 0.07);
+      return;
+    }
+
+    // ── 飛行船ドック ──────────────────────────────────────────────────
+    if (kind === "airDock") {
+      // 格納庫（アーチ型）
+      ctx.fillStyle = "#374151";
+      ctx.fillRect(s * 0.10, s * 0.40, s * 0.80, s * 0.48);
+      ctx.fillStyle = "#4b5563";
+      ctx.beginPath();
+      ctx.arc(centerX, s * 0.40, s * 0.40, Math.PI, 0);
+      ctx.fill();
+      // 扉
+      ctx.fillStyle = "#1e3a5f";
+      ctx.beginPath();
+      ctx.arc(centerX, s * 0.82, s * 0.22, Math.PI, 0);
+      ctx.fillRect(centerX - s * 0.22, s * 0.60, s * 0.44, s * 0.22);
+      ctx.fill();
+      // 窓（丸窓）
+      ctx.fillStyle = "#93c5fd";
+      ctx.beginPath();
+      ctx.arc(s * 0.35, s * 0.35, s * 0.06, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s * 0.65, s * 0.35, s * 0.06, 0, Math.PI * 2); ctx.fill();
+      // 煙突
+      ctx.fillStyle = "#6b7280";
+      ctx.fillRect(s * 0.44, s * 0.06, s * 0.12, s * 0.18);
+      return;
+    }
+
+    // ── 環礁・リーフ ──────────────────────────────────────────────────
+    if (kind === "reef") {
+      ctx.fillStyle = "#0369a1";
+      ctx.beginPath();
+      ctx.ellipse(centerX, s * 0.60, s * 0.44, s * 0.30, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#d97706";
+      ctx.beginPath();
+      ctx.ellipse(centerX, s * 0.54, s * 0.28, s * 0.20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // ヤシの木
+      ctx.fillStyle = "#78350f";
+      ctx.fillRect(s * 0.47, s * 0.24, s * 0.06, s * 0.32);
+      ctx.fillStyle = "#16a34a";
+      ctx.beginPath();
+      ctx.arc(s * 0.50, s * 0.22, s * 0.12, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+
+    // ── 祠・神殿 ──────────────────────────────────────────────────────
+    if (kind === "shrine") {
+      // 鳥居の柱
+      ctx.fillStyle = "#dc2626";
+      ctx.fillRect(s * 0.18, s * 0.32, s * 0.08, s * 0.50);
+      ctx.fillRect(s * 0.74, s * 0.32, s * 0.08, s * 0.50);
+      // 鳥居の横木（上下2本）
+      ctx.fillRect(s * 0.10, s * 0.28, s * 0.80, s * 0.07);
+      ctx.fillRect(s * 0.16, s * 0.38, s * 0.68, s * 0.06);
+      // 奥の建物
+      ctx.fillStyle = "#7c3aed";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.30, s * 0.50); ctx.lineTo(s * 0.50, s * 0.34); ctx.lineTo(s * 0.70, s * 0.50);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ede9fe";
+      ctx.fillRect(s * 0.34, s * 0.50, s * 0.32, s * 0.28);
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(s * 0.44, s * 0.60, s * 0.12, s * 0.18);
+      return;
+    }
+
+    // ── 職人の村 ──────────────────────────────────────────────────────
+    if (kind === "artisan") {
+      // 鍛冶場の煙突
+      ctx.fillStyle = "#d97706";
+      ctx.beginPath();
+      ctx.moveTo(s * 0.16, s * 0.46); ctx.lineTo(s * 0.50, s * 0.22); ctx.lineTo(s * 0.84, s * 0.46);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#92400e";
+      ctx.fillRect(s * 0.22, s * 0.46, s * 0.56, s * 0.34);
+      // 煙突
+      ctx.fillStyle = "#374151";
+      ctx.fillRect(s * 0.34, s * 0.22, s * 0.10, s * 0.18);
+      ctx.fillRect(s * 0.56, s * 0.22, s * 0.10, s * 0.18);
+      // 炎
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.arc(s * 0.39, s * 0.20, s * 0.05, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s * 0.61, s * 0.20, s * 0.05, 0, Math.PI * 2); ctx.fill();
+      // 扉
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(s * 0.43, s * 0.58, s * 0.14, s * 0.22);
+      return;
+    }
+
+    // ── 家（民家） ────────────────────────────────────────────────────
+    // house/school/town variants（以下は既存のfallback）
     const wall = kind === "school" ? "#d9e2ef" : kind === "mysticVillage" ? "#d6d3ff" : kind === "catVillage" ? "#ffe4e6" : "#f2e7d5";
-    const roof = kind === "school" ? "#475569" : kind === "castleTown" ? "#7f1d1d" : kind === "mysticVillage" ? "#4c1d95" : kind === "catVillage" ? "#be123c" : "#b45309";
+    const roof = kind === "school" ? "#475569" : kind === "mysticVillage" ? "#4c1d95" : kind === "catVillage" ? "#be123c" : "#b45309";
     ctx.fillStyle = roof;
     ctx.beginPath();
-    ctx.moveTo(s * 0.16, s * 0.44);
-    ctx.lineTo(s * 0.5, s * 0.2);
-    ctx.lineTo(s * 0.84, s * 0.44);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(s * 0.16, s * 0.44); ctx.lineTo(s * 0.5, s * 0.20); ctx.lineTo(s * 0.84, s * 0.44);
+    ctx.closePath(); ctx.fill();
     ctx.fillStyle = wall;
     ctx.fillRect(s * 0.22, s * 0.44, s * 0.56, s * 0.34);
 
-    if (kind === "castleTown") {
-      ctx.fillStyle = "#9ca3af";
-      ctx.fillRect(s * 0.1, s * 0.34, s * 0.14, s * 0.44);
-      ctx.fillRect(s * 0.76, s * 0.34, s * 0.14, s * 0.44);
-      ctx.fillStyle = "#fca5a5";
-      ctx.fillRect(s * 0.43, s * 0.56, s * 0.14, s * 0.22);
-    } else if (kind === "catVillage") {
+    if (kind === "catVillage") {
       ctx.fillStyle = "#111827";
       ctx.beginPath();
       ctx.arc(s * 0.42, s * 0.64, s * 0.03, 0, Math.PI * 2);
       ctx.arc(s * 0.58, s * 0.64, s * 0.03, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(s * 0.46, s * 0.71);
-      ctx.lineTo(s * 0.5, s * 0.67);
-      ctx.lineTo(s * 0.54, s * 0.71);
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      ctx.moveTo(s * 0.46, s * 0.71); ctx.lineTo(s * 0.5, s * 0.67); ctx.lineTo(s * 0.54, s * 0.71);
+      ctx.strokeStyle = "#111827"; ctx.lineWidth = 1; ctx.stroke();
     } else if (kind === "school") {
       ctx.fillStyle = "#2563eb";
       ctx.fillRect(s * 0.44, s * 0.54, s * 0.12, s * 0.24);
       ctx.fillStyle = "#facc15";
-      ctx.fillRect(s * 0.26, s * 0.54, s * 0.12, s * 0.1);
-      ctx.fillRect(s * 0.62, s * 0.54, s * 0.12, s * 0.1);
+      ctx.fillRect(s * 0.26, s * 0.54, s * 0.12, s * 0.10);
+      ctx.fillRect(s * 0.62, s * 0.54, s * 0.12, s * 0.10);
     } else {
       ctx.fillStyle = kind === "home" ? "#16a34a" : "#8b5cf6";
       ctx.fillRect(s * 0.44, s * 0.56, s * 0.12, s * 0.22);
@@ -2210,7 +2450,7 @@ function PrologueScreen({ playerName, onDone }) {
 }
 
 // ─── MAP SCREEN (スプライト + キーボード対応) ─────────────────────────────────
-function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight = false }) {
+function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, timeOfDay = "day" }) {
   const [showLargeMap, setShowLargeMap] = useState(false);
   const [viewport, setViewport] = useState(() => ({
     w: typeof window !== "undefined" ? window.innerWidth : 390,
@@ -2266,9 +2506,13 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
     }),
   );
 
-  // 昼夜サイクル（isNight = リアルタイム3分切り替え）
-  const timeLabel = isNight ? "夜" : "昼";
-  const nightOverlay = isNight ? "rgba(0,15,70,0.48)" : "rgba(0,0,0,0)";
+  // 時間帯サイクル（3分ごと：朝→昼→夕→夜）
+  const timeLabel = { morning: "朝", day: "昼", evening: "夕", night: "夜" }[timeOfDay] ?? "昼";
+  const nightOverlay =
+    timeOfDay === "night"   ? "rgba(0,15,70,0.50)"  :
+    timeOfDay === "evening" ? "rgba(100,40,0,0.28)" :
+    timeOfDay === "morning" ? "rgba(255,160,0,0.12)" :
+    "rgba(0,0,0,0)";
 
   const tileName = {
     [TILE.GRASS]:"草原",[TILE.FOREST]:"森",[TILE.WATER]:"川",[TILE.MOUNTAIN]:"山岳",
@@ -2352,7 +2596,16 @@ function MapScreen({ player, onMove, onInvestigate, onInfo, onQuickSave, isNight
                     <TileCanvas tile={tile} size={tileSize} />
                     <span style={{ position:"relative", zIndex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
                       {isPlayer
-                        ? <HeroSprite gender={player.gender} direction={player.direction} animStep={player.animStep} size={heroSize} />
+                        ? (() => {
+                            const _waterTiles = [TILE.SEA, TILE.LAKE, TILE.WATER];
+                            const _vm =
+                              canUseAirship(player) && ([TILE.MOUNTAIN, ...(_waterTiles)].includes(tile)) ? "airship"
+                              : canUseShip(player) && _waterTiles.includes(tile) ? "ship"
+                              : null;
+                            return _vm
+                              ? <VehicleSprite type={_vm} direction={player.direction} size={Math.round(tileSize * 1.3)} />
+                              : <HeroSprite gender={player.gender} direction={player.direction} animStep={player.animStep} size={heroSize} />;
+                          })()
                         : isSign ? <SignPostIcon size={iconSize} />
                         : landmarkType ? <WorldLandmarkIcon kind={landmarkType} size={iconSize + 2} /> : null}
                     </span>
@@ -3550,10 +3803,14 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
   ];
   const hasRoyalQuest = (player.storyFlags || []).includes("story:royalQuest");
   return (
-    <div className="absolute inset-0 bg-black/95 flex flex-col text-white p-4 gap-3 z-50">
-      <p className="text-center text-yellow-300 text-sm border-b border-gray-700 pb-2"
+    <div className="absolute inset-0 bg-black/95 flex flex-col text-white z-50 min-h-0">
+      <p className="flex-shrink-0 text-center text-yellow-300 text-sm border-b border-gray-700 pb-2 px-4 pt-4"
         style={{ fontFamily:"'Courier New',monospace" }}>── じょうほう ──</p>
-      <div className="border border-gray-700 p-3 text-xs space-y-1" style={{ fontFamily:"'Courier New',monospace" }}>
+      <div
+        data-allow-touch-scroll="true"
+        className="info-overlay-scroll flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pb-4 flex flex-col gap-3"
+      >
+      <div className="border border-gray-700 p-3 text-xs space-y-1 shrink-0" style={{ fontFamily:"'Courier New',monospace" }}>
         <p>なまえ ：{player.name}（{player.gender === "male" ? "男の子" : "女の子"}）</p>
         <p>レベル ：{player.level}　　EXP：{player.exp}</p>
         <p>HP     ：{player.hp} / {player.maxHp}</p>
@@ -3619,8 +3876,9 @@ function InfoOverlay({ player, onClose, onSave, onWarp, onUseRecorder }) {
       )}
       <button className="border-2 border-yellow-400 text-yellow-300 py-3 text-sm active:opacity-60"
         style={{ fontFamily:"'Courier New',monospace" }} onClick={onSave}>セーブする</button>
-      <button className="border-2 border-white py-2 text-sm active:opacity-60"
+      <button className="border-2 border-white py-2 text-sm active:opacity-60 shrink-0"
         style={{ fontFamily:"'Courier New',monospace" }} onClick={onClose}>とじる</button>
+      </div>
     </div>
   );
 }

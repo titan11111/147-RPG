@@ -12,7 +12,7 @@ function App() {
   const [interiorType, setInteriorType] = useState(null);
   const [hasSave, setHasSave]         = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
-  const [isNight, setIsNight]         = useState(false);
+  const [timeOfDay, setTimeOfDay]     = useState("day"); // "morning"|"day"|"evening"|"night"
   const gameFrameRef = useRef(null);
   const audioCtxRef  = useRef(null);
   const moveLockRef  = useRef(0);
@@ -70,9 +70,13 @@ function App() {
     return () => { mounted = false; };
   }, []);
 
-  // 昼夜サイクル：3分ごとに切り替え
+  // 昼夜サイクル：3分ごとに朝→昼→夕方→夜と切り替え
   useEffect(() => {
-    const id = setInterval(() => setIsNight(n => !n), 180000);
+    const TOD_CYCLE = ["morning", "day", "evening", "night"];
+    const id = setInterval(() => setTimeOfDay(prev => {
+      const idx = TOD_CYCLE.indexOf(prev);
+      return TOD_CYCLE[(idx + 1) % 4];
+    }), 180000);
     return () => clearInterval(id);
   }, []);
 
@@ -111,6 +115,10 @@ function App() {
         'button, a[href], input, select, textarea, label, [role="button"], [tabindex="0"]',
       );
     };
+    const isScrollableTouchTarget = (el) => {
+      if (!el || !gameFrameRef.current?.contains(el)) return false;
+      return !!el.closest("[data-allow-touch-scroll=\"true\"]");
+    };
     const onTE = (e) => {
       const now = Date.now();
       if (now - lastTouchEnd <= 300) e.preventDefault();
@@ -118,7 +126,9 @@ function App() {
     };
     const onTM = (e) => {
       if (!gameFrameRef.current?.contains(e.target)) return;
-      if (isClickableTouchTarget(touchEl(e))) return;
+      const el = touchEl(e);
+      if (isClickableTouchTarget(el)) return;
+      if (isScrollableTouchTarget(el)) return;
       e.preventDefault();
     };
     document.addEventListener("touchstart", onTM, { passive: false });
@@ -132,16 +142,20 @@ function App() {
   }, []);
 
   const BGM_LIBRARY = useMemo(() => ({
-    fieldA:  "./bgm-field.mp3",
-    townA:   "./bgm-town.mp3",
-    battleA: "./bgm-battle.mp3",
-    bossA:   "./bgm-boss.mp3",
+    fieldA:   "./bgm-field.mp3",
+    townA:    "./bgm-town.mp3",
+    battleA:  "./bgm-battle.mp3",
+    bossA:    "./bgm-boss.mp3",
+    shipA:    "./images/蒼き帆の歌.mp3",
+    airshipA: "./images/飛空艇.mp3",
   }), []);
   const BGM_SCENES = useMemo(() => ({
-    field:  ["fieldA"],
-    town:   ["townA"],
-    battle: ["battleA"],
-    boss:   ["bossA"],
+    field:   ["fieldA"],
+    town:    ["townA"],
+    battle:  ["battleA"],
+    boss:    ["bossA"],
+    ship:    ["shipA"],
+    airship: ["airshipA"],
   }), []);
 
   const stopBgm = useCallback(() => {
@@ -333,6 +347,23 @@ function App() {
     }
   }, [screen, interiorType, isBoss, hasPlayer, startBgm, stopBgm]);
 
+  // 乗り物BGM切り替え（船・飛空艇タイルに入ったとき）
+  const playerPosX = player?.pos?.x;
+  const playerPosY = player?.pos?.y;
+  const playerFlags = player?.storyFlags;
+  useEffect(() => {
+    if (screen !== SCREEN.MAP || !player) return;
+    const tile = MAP_GRID[player.pos.y][player.pos.x];
+    const waterTiles = [TILE.SEA, TILE.LAKE, TILE.WATER];
+    if (canUseAirship(player) && (tile === TILE.MOUNTAIN || waterTiles.includes(tile))) {
+      startBgm("airship");
+    } else if (canUseShip(player) && waterTiles.includes(tile)) {
+      startBgm("ship");
+    } else if (bgmModeRef.current === "ship" || bgmModeRef.current === "airship") {
+      startBgm("field");
+    }
+  }, [screen, playerPosX, playerPosY, playerFlags, startBgm]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => () => stopBgm(), [stopBgm]);
   useEffect(() => {
     if (screen !== SCREEN.GAMEOVER) gameOverSfxLockRef.current = false;
@@ -443,7 +474,7 @@ function App() {
       if ([TILE.GRASS, TILE.FOREST, TILE.DESERT, TILE.MOUNTAIN, TILE.SNOW].includes(tile)) {
         const newCounter = moved.encounterCounter - 1;
         if (newCounter <= 0) {
-          const enemy = getEnemyForZone(tile, { x: nx, y: ny }, isNight);
+          const enemy = getEnemyForZone(tile, { x: nx, y: ny }, timeOfDay === "night");
           const tuned = tuneEnemyForPhase(enemy, moved, { isBoss: false, tile });
           setTimeout(() => { setCurrentEnemy(tuned); setIsBoss(false); setScreen(SCREEN.BATTLE); }, 100);
           moved = { ...moved, encounterCounter: getEncounterCounterForPlayer(moved) };
@@ -737,7 +768,7 @@ function App() {
             onInvestigate={handleInvestigate}
             onInfo={() => setShowInfo(true)}
             onQuickSave={saveGame}
-            isNight={isNight}
+            timeOfDay={timeOfDay}
           />
         )}
         {screen === SCREEN.INTERIOR && player && interiorType && (

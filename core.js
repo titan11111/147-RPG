@@ -180,23 +180,23 @@ const SAVE_POINT_POS = [
 ];
 
 const WORLD_MARKERS = {
-  [`${SPECIAL_POS.village.y},${SPECIAL_POS.village.x}`]: "village",
-  [`${SPECIAL_POS.town.y},${SPECIAL_POS.town.x}`]: "castleTown",
-  [`${SPECIAL_POS.castle.y},${SPECIAL_POS.castle.x}`]: "castleTown",
-  [`${SPECIAL_POS.artisanVillage.y},${SPECIAL_POS.artisanVillage.x}`]: "village",
-  [`${SPECIAL_POS.school.y},${SPECIAL_POS.school.x}`]: "school",
-  [`${SPECIAL_POS.home.y},${SPECIAL_POS.home.x}`]: "home",
-  [`${SPECIAL_POS.cave.y},${SPECIAL_POS.cave.x}`]: "cave",
-  [`${SPECIAL_POS.catCave.y},${SPECIAL_POS.catCave.x}`]: "cave",
+  [`${SPECIAL_POS.village.y},${SPECIAL_POS.village.x}`]:             "village",
+  [`${SPECIAL_POS.town.y},${SPECIAL_POS.town.x}`]:                   "castleTown",
+  [`${SPECIAL_POS.castle.y},${SPECIAL_POS.castle.x}`]:               "castle",
+  [`${SPECIAL_POS.artisanVillage.y},${SPECIAL_POS.artisanVillage.x}`]: "artisan",
+  [`${SPECIAL_POS.school.y},${SPECIAL_POS.school.x}`]:               "school",
+  [`${SPECIAL_POS.home.y},${SPECIAL_POS.home.x}`]:                   "home",
+  [`${SPECIAL_POS.cave.y},${SPECIAL_POS.cave.x}`]:                   "cave",
+  [`${SPECIAL_POS.catCave.y},${SPECIAL_POS.catCave.x}`]:             "cave",
   [`${SPECIAL_POS.manabiVillage.y},${SPECIAL_POS.manabiVillage.x}`]: "village",
-  [`${SPECIAL_POS.nazoVillage.y},${SPECIAL_POS.nazoVillage.x}`]: "mysticVillage",
-  [`${SPECIAL_POS.catVillage.y},${SPECIAL_POS.catVillage.x}`]: "catVillage",
-  [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]: "onsen",
-  [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]: "village",
-  [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]: "village",
-  [`${SPECIAL_POS.airDock.y},${SPECIAL_POS.airDock.x}`]: "village",
-  [`${SPECIAL_POS.shipReef.y},${SPECIAL_POS.shipReef.x}`]: "village",
-  [`${SPECIAL_POS.skySanctum.y},${SPECIAL_POS.skySanctum.x}`]: "village",
+  [`${SPECIAL_POS.nazoVillage.y},${SPECIAL_POS.nazoVillage.x}`]:     "mysticVillage",
+  [`${SPECIAL_POS.catVillage.y},${SPECIAL_POS.catVillage.x}`]:       "catVillage",
+  [`${SPECIAL_POS.onsen.y},${SPECIAL_POS.onsen.x}`]:                 "onsen",
+  [`${SPECIAL_POS.southShrine.y},${SPECIAL_POS.southShrine.x}`]:     "shrine",
+  [`${SPECIAL_POS.shipyard.y},${SPECIAL_POS.shipyard.x}`]:           "shipyard",
+  [`${SPECIAL_POS.airDock.y},${SPECIAL_POS.airDock.x}`]:             "airDock",
+  [`${SPECIAL_POS.shipReef.y},${SPECIAL_POS.shipReef.x}`]:           "reef",
+  [`${SPECIAL_POS.skySanctum.y},${SPECIAL_POS.skySanctum.x}`]:       "shrine",
 };
 
 function getWorldLandmarkType(tile, x, y) {
@@ -662,6 +662,16 @@ function generateMapGrid() {
   ensureLandAccess(SPECIAL_POS.southShrine, 1);
   // 中心タイルは町扱いを維持
   grid[SPECIAL_POS.shipyard.y][SPECIAL_POS.shipyard.x] = TILE.TOWN;
+  // 船着き場の南側に接岸可能な海を固定（水辺がないと乗船できないため）
+  for (let dy = 3; dy <= 6; dy++) {
+    const sy = SPECIAL_POS.shipyard.y + dy;
+    for (let dx = -1; dx <= 1; dx++) {
+      const sx = SPECIAL_POS.shipyard.x + dx;
+      if (sx >= 1 && sy < MAP_SIZE - 1 && ![TILE.TOWN, TILE.SCHOOL, TILE.HOME, TILE.CAVE].includes(grid[sy][sx])) {
+        grid[sy][sx] = TILE.SEA;
+      }
+    }
+  }
   grid[SPECIAL_POS.southShrine.y][SPECIAL_POS.southShrine.x] = TILE.TOWN;
 
   // ─ 雪原生成（洞窟周辺をSNOWタイルで覆う）────────────────────────────────
